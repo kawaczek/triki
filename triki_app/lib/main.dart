@@ -57,6 +57,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // Saved settings
   String? _savedDeviceId;
+  String? _savedDeviceName;
   double _sensitivityX = 1.2;
   double _sensitivityY = 1.2;
   double _deadzone = 0.15;
@@ -136,6 +137,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _savedDeviceId = prefs.getString('saved_device_id');
+      _savedDeviceName = prefs.getString('saved_device_name');
       _sensitivityX = prefs.getDouble('sensitivity_x') ?? 1.2;
       _sensitivityY = prefs.getDouble('sensitivity_y') ?? 1.2;
       _deadzone = prefs.getDouble('deadzone') ?? 0.15;
@@ -152,7 +154,7 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     if (_savedDeviceId != null) {
-      _tryAutoConnect();
+      _connectToSavedDevice();
     }
   }
 
@@ -210,19 +212,42 @@ class _DashboardPageState extends State<DashboardPage> {
     await FlutterBluePlus.stopScan();
   }
 
-  void _tryAutoConnect() async {
-    _showSnackBar("Próba automatycznego połączenia z Triki...");
-    _startScan();
-    await Future.delayed(const Duration(seconds: 4));
-    if (_connectedDevice != null) return;
+  // Connects directly to the saved device without scanning, using autoConnect: true
+  // This is highly efficient and connects instantly as soon as the cap is turned on!
+  void _connectToSavedDevice() async {
+    if (_savedDeviceId == null) return;
+    _showSnackBar("Oczekiwanie na włączenie zapisanego kapsla... 🐾");
+    
+    setState(() {
+      _connectionState = BluetoothConnectionState.connecting;
+    });
 
-    for (var r in _scanResults) {
-      if (r.device.remoteId.str == _savedDeviceId) {
-        _connectToDevice(r.device);
-        break;
-      }
+    try {
+      final device = BluetoothDevice.fromId(_savedDeviceId!);
+      _connectedDevice = device;
+
+      _connStateSub = device.connectionState.listen((state) {
+        setState(() {
+          _connectionState = state;
+        });
+        if (state == BluetoothConnectionState.connected) {
+          _discoverServices(device);
+        } else if (state == BluetoothConnectionState.disconnected) {
+          _cleanupConnection();
+          // Retry background autoConnect in case of disconnect
+          _connectToSavedDevice();
+        }
+      });
+
+      // autoConnect: true instructs Android OS to monitor for the device advertisement
+      // and establish connection immediately in the background once it wakes up!
+      await device.connect(autoConnect: true);
+    } catch (e) {
+      setState(() {
+        _connectionState = BluetoothConnectionState.disconnected;
+      });
+      _showSnackBar("Nie udało się połączyć z zapisanym urządzeniem: $e");
     }
-    _stopScan();
   }
 
   Future<void> _connectToDevice(BluetoothDevice device) async {
@@ -232,18 +257,29 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     try {
+      // Direct connection
       await device.connect(autoConnect: false).timeout(const Duration(seconds: 8));
       _connectedDevice = device;
       
+      final name = device.platformName.isNotEmpty ? device.platformName : "Triki Kapsel";
       await _saveSetting('saved_device_id', device.remoteId.str);
-      _savedDeviceId = device.remoteId.str;
+      await _saveSetting('saved_device_name', name);
+      
+      setState(() {
+        _savedDeviceId = device.remoteId.str;
+        _savedDeviceName = name;
+      });
 
       _connStateSub = device.connectionState.listen((state) {
         setState(() {
           _connectionState = state;
         });
-        if (state == BluetoothConnectionState.disconnected) {
+        if (state == BluetoothConnectionState.connected) {
+          _discoverServices(device);
+        } else if (state == BluetoothConnectionState.disconnected) {
           _cleanupConnection();
+          // If disconnected, switch to background auto-reconnect
+          _connectToSavedDevice();
         }
       });
 
@@ -254,6 +290,18 @@ class _DashboardPageState extends State<DashboardPage> {
       });
       _showSnackBar("Błąd połączenia: $e");
     }
+  }
+
+  Future<void> _forgetSavedDevice() async {
+    _disconnect();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('saved_device_id');
+    await prefs.remove('saved_device_name');
+    setState(() {
+      _savedDeviceId = null;
+      _savedDeviceName = null;
+    });
+    _showSnackBar("Zapomniano zapisane urządzenie!");
   }
 
   Future<void> _discoverServices(BluetoothDevice device) async {
@@ -524,7 +572,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
         backgroundColor: const Color(0xFF1E293B),
         behavior: SnackBarBehavior.floating,
       ),
@@ -558,6 +606,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final bool isConnected = _connectionState == BluetoothConnectionState.connected;
+    final bool isConnecting = _connectionState == BluetoothConnectionState.connecting;
 
     return Scaffold(
       appBar: AppBar(
@@ -598,42 +647,82 @@ class _DashboardPageState extends State<DashboardPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isConnected ? 'Połączono z Triki' : 'Brak połączenia',
-                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              isConnected 
-                                  ? 'ID: ${_connectedDevice?.remoteId}' 
-                                  : 'Wyszukaj i sparuj kapsel',
-                              style: TextStyle(color: Colors.grey[400], fontSize: 13),
-                            ),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isConnected 
+                                    ? 'Połączono z Triki' 
+                                    : (isConnecting ? 'Oczekiwanie na kapsel...' : 'Brak połączenia'),
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              if (_savedDeviceId != null) ...[
+                                Row(
+                                  children: [
+                                    const Icon(Icons.bookmark, color: Color(0xFF22C55E), size: 14),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        'Zapisany: ${_savedDeviceName ?? "Kapsel"} (${_savedDeviceId!.substring(0, min(17, _savedDeviceId!.length))})',
+                                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else ...[
+                                Text(
+                                  'Wyszukaj i sparuj kapsel',
+                                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         _buildStatusIndicator(),
                       ],
                     ),
                     const SizedBox(height: 16),
                     if (!isConnected) ...[
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF22C55E),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                        ),
-                        icon: _isScanning 
-                            ? const SizedBox(
-                                width: 20, 
-                                height: 20, 
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                              )
-                            : const Icon(Icons.bluetooth_searching),
-                        label: Text(_isScanning ? 'Wyszukiwanie...' : 'Skanuj i Połącz z Triki'),
-                        onPressed: _isScanning ? _stopScan : _startScan,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF22C55E),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                              icon: _isScanning 
+                                  ? const SizedBox(
+                                      width: 20, 
+                                      height: 20, 
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                                    )
+                                  : const Icon(Icons.bluetooth_searching),
+                              label: Text(_isScanning ? 'Szukanie...' : 'Wyszukaj Kapsel'),
+                              onPressed: _isScanning ? _stopScan : _startScan,
+                            ),
+                          ),
+                          if (_savedDeviceId != null) ...[
+                            const SizedBox(width: 12),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.redAccent),
+                                foregroundColor: Colors.redAccent,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              ),
+                              icon: const Icon(Icons.bookmark_remove),
+                              label: const Text('Zapomnij'),
+                              onPressed: _forgetSavedDevice,
+                            ),
+                          ],
+                        ],
                       ),
                       if (_scanResults.isNotEmpty) ...[
                         const SizedBox(height: 12),
@@ -934,6 +1023,36 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget _buildSensorBarHorizontal(String label, double val, double minVal, double maxVal, Color c) {
+    double progress = (val - minVal) / (maxVal - minVal);
+    progress = progress.clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(val.toStringAsFixed(2), style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(100),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white.withOpacity(0.05),
+              valueColor: AlwaysStoppedAnimation<Color>(c),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSlider({
     required String title,
     required double val,
@@ -972,7 +1091,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// Visual Interactive Calibration Wizard with Custom Animations and Painters
 class CalibrationWizardSheet extends StatefulWidget {
   final MouseMode initialMode;
   final ButtonOrientation initialOrientation;
@@ -1418,7 +1536,7 @@ class _CalibrationWizardSheetState extends State<CalibrationWizardSheet> {
             )
           else
             const SizedBox(),
-          if (_currentStep != 2) // Step 2 requires triggering calibration button
+          if (_currentStep != 2) 
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF22C55E),
@@ -1434,7 +1552,6 @@ class _CalibrationWizardSheetState extends State<CalibrationWizardSheet> {
   }
 }
 
-// Custom 2D bottle cap painter with crown ridges and a red button
 class InteractiveCap2DPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -1460,7 +1577,6 @@ class InteractiveCap2DPainter extends CustomPainter {
       ..strokeWidth = 2
       ..style = PaintingStyle.fill;
 
-    // Draw ridges (cap crown look)
     final ridgePaint = Paint()
       ..color = Colors.white.withOpacity(0.15)
       ..strokeWidth = 4
@@ -1478,17 +1594,14 @@ class InteractiveCap2DPainter extends CustomPainter {
       );
     }
 
-    // Draw cap body base
     canvas.drawCircle(center, outerRadius, capPaint);
     canvas.drawCircle(center, outerRadius, borderPaint);
 
-    // Draw inner circle
     canvas.drawCircle(center, innerRadius, innerCapPaint);
     canvas.drawCircle(center, innerRadius, Paint()
       ..color = const Color(0xFF22C55E).withOpacity(0.08)
       ..style = PaintingStyle.fill);
 
-    // Draw stylized Z logo in green
     final logoPath = Path();
     logoPath.moveTo(center.dx - 18, center.dy - 18);
     logoPath.lineTo(center.dx + 18, center.dy - 18);
@@ -1499,7 +1612,6 @@ class InteractiveCap2DPainter extends CustomPainter {
     logoPath.close();
     canvas.drawPath(logoPath, zappkaLabelPaint);
 
-    // Draw physical RED button on top of cap rim
     final buttonPaint = Paint()
       ..color = const Color(0xFFEF4444)
       ..style = PaintingStyle.fill;
@@ -1508,8 +1620,6 @@ class InteractiveCap2DPainter extends CustomPainter {
       ..color = const Color(0xFFEF4444).withOpacity(0.4)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
 
-    // Button position: always draw at 0 angle (the build transform scales/rotates this canvas)
-    // In local space, we place the red button at right edge (0 rad)
     final buttonCenter = Offset(center.dx + outerRadius * 1.0, center.dy);
     canvas.drawCircle(buttonCenter, 14, buttonGlowPaint);
     canvas.drawCircle(buttonCenter, 8, buttonPaint);
