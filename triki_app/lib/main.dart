@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const TrikiApp());
 }
 
@@ -107,20 +108,27 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    _checkAccessibilityService();
-    _serviceCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+
+    // Defer all heavy/BLE work until after first frame is rendered
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadSettings();
+
       _checkAccessibilityService();
-    });
-
-    _fpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _sampleRate = _fpsCounter.toDouble();
-        _fpsCounter = 0;
+      _serviceCheckTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        _checkAccessibilityService();
       });
-    });
 
-    _initBluetooth();
+      _fpsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) {
+          setState(() {
+            _sampleRate = _fpsCounter.toDouble();
+            _fpsCounter = 0;
+          });
+        }
+      });
+
+      _initBluetooth();
+    });
   }
 
   @override
@@ -155,10 +163,7 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     if (_savedDeviceId != null) {
-      // Run connection in background so it doesn't block UI initialize
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _connectToSavedDevice();
-      });
+      _connectToSavedDevice();
     }
   }
 
@@ -189,17 +194,25 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _initBluetooth() {
-    _scanSub = FlutterBluePlus.scanResults.listen((results) {
-      setState(() {
-        _scanResults = results;
+    try {
+      _scanSub = FlutterBluePlus.scanResults.listen((results) {
+        if (mounted) {
+          setState(() {
+            _scanResults = results;
+          });
+        }
       });
-    });
 
-    FlutterBluePlus.isScanning.listen((scanning) {
-      setState(() {
-        _isScanning = scanning;
+      FlutterBluePlus.isScanning.listen((scanning) {
+        if (mounted) {
+          setState(() {
+            _isScanning = scanning;
+          });
+        }
       });
-    });
+    } catch (e) {
+      debugPrint('BLE init error: $e');
+    }
   }
 
   void _startScan() async {
