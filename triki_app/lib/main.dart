@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'games_page.dart';
 
 // ═══════════════════════════════════════════════════════════
 //  MODELS
@@ -81,7 +82,7 @@ class _TrikiAppState extends State<TrikiApp> {
       themeMode: _themeMode,
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
-      home: const DashboardPage(),
+      home: const _NavShell(),
     );
   }
 
@@ -111,6 +112,44 @@ class _TrikiAppState extends State<TrikiApp> {
         cardColor: Colors.white,
         appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
       );
+}
+
+class _NavShell extends StatefulWidget {
+  const _NavShell();
+  @override
+  State<_NavShell> createState() => _NavShellState();
+}
+
+class _NavShellState extends State<_NavShell> {
+  int _idx = 0;
+  final _pages = const [DashboardPage(), GamesPage()];
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: IndexedStack(index: _idx, children: _pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _idx,
+        onDestinationSelected: (i) => setState(() => _idx = i),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF0F1420) : Colors.white,
+        indicatorColor: cs.primary.withOpacity(0.2),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.mouse_outlined),
+            selectedIcon: Icon(Icons.mouse),
+            label: 'Mysz',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.sports_esports_outlined),
+            selectedIcon: Icon(Icons.sports_esports),
+            label: 'Gry',
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -573,7 +612,11 @@ class _DashboardPageState extends State<DashboardPage>
 
     if (mounted) setState(() { _gx = gx; _gy = gy; _gz = gz; _ax = ax; _ay = ay; _az = az; });
 
+    // Feed shared sensor stream for mini-games
+    sensorStream.value = TrikiSensorData(gx: gx, gy: gy, gz: gz, ax: ax, ay: ay, az: az);
+
     if (!_mouseEnabled || !_serviceRunning || _activeProfile == null) return;
+    if (gameActive.value) return; // pause mouse when game running
 
     final sx = _activeProfile!.sensitivityX;
     final sy = _activeProfile!.sensitivityY;
