@@ -30,6 +30,9 @@ class TrikiApp extends StatelessWidget {
   }
 }
 
+enum MouseMode { air, table }
+enum ButtonOrientation { left, front, right }
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -52,21 +55,27 @@ class _DashboardPageState extends State<DashboardPage> {
   List<ScanResult> _scanResults = [];
   StreamSubscription<List<ScanResult>>? _scanSub;
 
-  // Auto-connect and saved settings
+  // Saved settings
   String? _savedDeviceId;
-  double _sensitivityX = 1.0;
-  double _sensitivityY = 1.0;
+  double _sensitivityX = 1.2;
+  double _sensitivityY = 1.2;
   double _deadzone = 0.15;
   bool _mouseEnabled = true;
-  bool _accelTapClick = true;
-  bool _volumeKeyClick = true;
+  bool _accelTapClick = false; // Turned off by default in favor of physical button
+  bool _physicalButtonClick = true; // Use physical button!
 
-  // Calibration Offsets
+  // Mouse Mode & Orientation
+  MouseMode _mouseMode = MouseMode.air;
+  ButtonOrientation _buttonOrientation = ButtonOrientation.left;
+
+  // Calibration Offsets (Tare values)
   double _offsetX = 0.0;
   double _offsetY = 0.0;
   double _offsetZ = 0.0;
+  double _accelOffsetX = 0.0;
+  double _accelOffsetY = 0.0;
 
-  // Telemetry parsed state
+  // Telemetry state
   double _gyroX = 0.0, _gyroY = 0.0, _gyroZ = 0.0;
   double _accelX = 0.0, _accelY = 0.0, _accelZ = 0.0;
   int _receivedFrames = 0;
@@ -75,6 +84,13 @@ class _DashboardPageState extends State<DashboardPage> {
   Timer? _fpsTimer;
   int _fpsCounter = 0;
 
+  // Velocity integration for Table Mouse
+  double _velocityX = 0.0;
+  double _velocityY = 0.0;
+
+  // Button state variables
+  bool _isButtonPressed = false;
+
   // Accessibility service status
   bool _isAccessibilityServiceRunning = false;
   Timer? _serviceCheckTimer;
@@ -82,7 +98,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // Buffer for NUS packets
   List<int> _rxBuffer = [];
 
-  // Shock/Tap Click detection variables
+  // Shock Tap Click variables
   double _lastAccelZ = 0.0;
   DateTime _lastClickTime = DateTime.now();
 
@@ -95,7 +111,6 @@ class _DashboardPageState extends State<DashboardPage> {
       _checkAccessibilityService();
     });
 
-    // Start FPS counter
     _fpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _sampleRate = _fpsCounter.toDouble();
@@ -103,7 +118,6 @@ class _DashboardPageState extends State<DashboardPage> {
       });
     });
 
-    // Request permissions and start scanning/reconnect
     _initBluetooth();
   }
 
@@ -122,15 +136,19 @@ class _DashboardPageState extends State<DashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _savedDeviceId = prefs.getString('saved_device_id');
-      _sensitivityX = prefs.getDouble('sensitivity_x') ?? 1.0;
-      _sensitivityY = prefs.getDouble('sensitivity_y') ?? 1.0;
+      _sensitivityX = prefs.getDouble('sensitivity_x') ?? 1.2;
+      _sensitivityY = prefs.getDouble('sensitivity_y') ?? 1.2;
       _deadzone = prefs.getDouble('deadzone') ?? 0.15;
       _mouseEnabled = prefs.getBool('mouse_enabled') ?? true;
-      _accelTapClick = prefs.getBool('accel_tap_click') ?? true;
-      _volumeKeyClick = prefs.getBool('volume_key_click') ?? true;
+      _accelTapClick = prefs.getBool('accel_tap_click') ?? false;
+      _physicalButtonClick = prefs.getBool('physical_button_click') ?? true;
+      _mouseMode = MouseMode.values[prefs.getInt('mouse_mode') ?? 0];
+      _buttonOrientation = ButtonOrientation.values[prefs.getInt('button_orientation') ?? 0];
       _offsetX = prefs.getDouble('offset_x') ?? 0.0;
       _offsetY = prefs.getDouble('offset_y') ?? 0.0;
       _offsetZ = prefs.getDouble('offset_z') ?? 0.0;
+      _accelOffsetX = prefs.getDouble('accel_offset_x') ?? 0.0;
+      _accelOffsetY = prefs.getDouble('accel_offset_y') ?? 0.0;
     });
 
     if (_savedDeviceId != null) {
@@ -146,6 +164,8 @@ class _DashboardPageState extends State<DashboardPage> {
       await prefs.setBool(key, value);
     } else if (value is String) {
       await prefs.setString(key, value);
+    } else if (value is int) {
+      await prefs.setInt(key, value);
     }
   }
 
@@ -163,7 +183,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _initBluetooth() {
-    // Watch scan results
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       setState(() {
         _scanResults = results;
@@ -192,11 +211,10 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _tryAutoConnect() async {
-    _showSnackBar("Próba automatycznego łączenia...");
-    // Scan briefly to find the saved device
+    _showSnackBar("Próba automatycznego połączenia z Triki...");
     _startScan();
     await Future.delayed(const Duration(seconds: 4));
-    if (_connectedDevice != null) return; // Already connected
+    if (_connectedDevice != null) return;
 
     for (var r in _scanResults) {
       if (r.device.remoteId.str == _savedDeviceId) {
@@ -217,7 +235,6 @@ class _DashboardPageState extends State<DashboardPage> {
       await device.connect(autoConnect: false).timeout(const Duration(seconds: 8));
       _connectedDevice = device;
       
-      // Save for auto-connect
       await _saveSetting('saved_device_id', device.remoteId.str);
       _savedDeviceId = device.remoteId.str;
 
@@ -270,24 +287,22 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       if (_rxChar == null || _txChar == null) {
-        _showSnackBar("Brak wymaganych charakterystyk RX/TX!");
+        _showSnackBar("Brak charakterystyk RX/TX!");
         _disconnect();
         return;
       }
 
-      // Start notifications on TX
       await _txChar!.setNotifyValue(true);
       _txSub = _txChar!.lastValueStream.listen((data) {
         _handleRawBytes(data);
       });
 
-      // Write START command to RX: 201000D007680003
       final startCmd = [0x20, 0x10, 0x00, 0xD0, 0x07, 0x68, 0x00, 0x03];
       await _rxChar!.write(startCmd, withoutResponse: true);
 
-      _showSnackBar("Połączono z Triki i aktywowano stream! 🐾");
+      _showSnackBar("Połączono z Triki i uruchomiono mysz! 🐾");
     } catch (e) {
-      _showSnackBar("Błąd konfiguracji usług: $e");
+      _showSnackBar("Błąd konfiguracji BLE: $e");
       _disconnect();
     }
   }
@@ -298,7 +313,8 @@ class _DashboardPageState extends State<DashboardPage> {
     while (_rxBuffer.length >= 14) {
       int headerIdx = -1;
       for (int i = 0; i < _rxBuffer.length - 1; i++) {
-        if (_rxBuffer[i] == 0x22 && _rxBuffer[i + 1] == 0x00) {
+        // Look for header 0x22
+        if (_rxBuffer[i] == 0x22) {
           headerIdx = i;
           break;
         }
@@ -334,9 +350,10 @@ class _DashboardPageState extends State<DashboardPage> {
     _receivedFrames++;
     _fpsCounter++;
 
-    // Parse bytes
-    // Frame layout: 22 00 | gyroX | gyroY | gyroZ | accelX | accelY | accelZ
-    // Each 16-bit little endian signed integer
+    // Parse values
+    // Byte 0: 0x22
+    // Byte 1: Button state! (0x00 = released, 0x01 = pressed)
+    final btnState = frame[1];
     final rawGx = _readInt16LE(frame, 2);
     final rawGy = _readInt16LE(frame, 4);
     final rawGz = _readInt16LE(frame, 6);
@@ -345,13 +362,25 @@ class _DashboardPageState extends State<DashboardPage> {
     final rawAz = _readInt16LE(frame, 12);
 
     // Scaling
-    final gx = rawGx / 131.0 - _offsetX;
-    final gy = rawGy / 131.0 - _offsetY;
-    final gz = rawGz / 131.0 - _offsetZ;
+    double gx = rawGx / 131.0 - _offsetX;
+    double gy = rawGy / 131.0 - _offsetY;
+    double gz = rawGz / 131.0 - _offsetZ;
 
-    final ax = rawAx / 2048.0;
-    final ay = rawAy / 2048.0;
-    final az = rawAz / 2048.0;
+    double ax = rawAx / 2048.0 - _accelOffsetX;
+    double ay = rawAy / 2048.0 - _accelOffsetY;
+    double az = rawAz / 2048.0;
+
+    // Handle physical button click transitions
+    if (_physicalButtonClick) {
+      bool pressed = btnState != 0x00;
+      if (pressed && !_isButtonPressed) {
+        // Button pressed transition (Click)
+        _isButtonPressed = true;
+        _triggerSystemClick();
+      } else if (!pressed && _isButtonPressed) {
+        _isButtonPressed = false;
+      }
+    }
 
     setState(() {
       _gyroX = gx;
@@ -362,12 +391,12 @@ class _DashboardPageState extends State<DashboardPage> {
       _accelZ = az;
     });
 
-    // Acceleration-based Tap-to-Click detection (Z axis shock)
+    // Z-Shock click detection (alternative)
     if (_accelTapClick) {
       double diffZ = (az - _lastAccelZ).abs();
-      if (diffZ > 0.8) { // Shock threshold
+      if (diffZ > 0.9) {
         final now = DateTime.now();
-        if (now.difference(_lastClickTime).inMilliseconds > 400) {
+        if (now.difference(_lastClickTime).inMilliseconds > 450) {
           _lastClickTime = now;
           _triggerSystemClick();
         }
@@ -375,19 +404,67 @@ class _DashboardPageState extends State<DashboardPage> {
       _lastAccelZ = az;
     }
 
-    // Air Mouse movement
+    // Remap axes based on physical red button direction
+    double inputGx = gx;
+    double inputGz = gz;
+    double inputAx = ax;
+    double inputAy = ay;
+
+    if (_buttonOrientation == ButtonOrientation.front) {
+      // Button points towards user
+      inputGx = gy;
+      inputGz = -gx;
+      inputAx = ay;
+      inputAy = -ax;
+    } else if (_buttonOrientation == ButtonOrientation.right) {
+      // Button points right
+      inputGx = -gx;
+      inputGz = -gz;
+      inputAx = -ax;
+      inputAy = -ay;
+    }
+
+    // Air Mouse vs Table Mouse logic
     if (_mouseEnabled && _isAccessibilityServiceRunning) {
-      // Rotate left/right (Yaw / gz) -> Move mouse X
-      // Tilt up/down (Pitch / gx) -> Move mouse Y
-      double dx = -gz * _sensitivityX;
-      double dy = gx * _sensitivityY;
+      double dx = 0.0;
+      double dy = 0.0;
 
-      // Apply deadzone
-      if (dx.abs() < _deadzone) dx = 0;
-      if (dy.abs() < _deadzone) dy = 0;
+      if (_mouseMode == MouseMode.air) {
+        // Air mode: Yaw / Gz determines horizontal, Pitch / Gx determines vertical
+        dx = -inputGz * _sensitivityX;
+        dy = inputGx * _sensitivityY;
 
-      if (dx != 0 || dy != 0) {
-        _mouseChannel.invokeMethod('moveCursor', {'dx': dx, 'dy': dy});
+        // Apply deadzone
+        if (dx.abs() < _deadzone) dx = 0;
+        if (dy.abs() < _deadzone) dy = 0;
+
+        if (dx != 0 || dy != 0) {
+          _mouseChannel.invokeMethod('moveCursor', {'dx': dx, 'dy': dy});
+        }
+      } else {
+        // Table mode: uses accelerometer translation!
+        // We integrate acceleration to find velocity, and apply friction damping to auto-zero
+        // Deadzone filters out sensor noise
+        double accThreshold = 0.08;
+        double inputX = inputAx;
+        double inputY = inputAy;
+
+        if (inputX.abs() < accThreshold) inputX = 0.0;
+        if (inputY.abs() < accThreshold) inputY = 0.0;
+
+        // Friction damping factor (clears movement when stationary)
+        const friction = 0.82;
+
+        _velocityX = (_velocityX + inputX * 9.81 * 0.02) * friction;
+        _velocityY = (_velocityY - inputY * 9.81 * 0.02) * friction; // Invert Y for screen coordinates
+
+        // Scale velocity to cursor steps
+        dx = _velocityX * _sensitivityX * 25.0;
+        dy = _velocityY * _sensitivityY * 25.0;
+
+        if (dx.abs() > 0.1 || dy.abs() > 0.1) {
+          _mouseChannel.invokeMethod('moveCursor', {'dx': dx, 'dy': dy});
+        }
       }
     }
   }
@@ -408,15 +485,19 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _calibrateZero() async {
     setState(() {
-      // In a real calibrate, we read current raw values and subtract them as offset
-      // Since we already scaled, let's add the scaled values to offset
       _offsetX += _gyroX;
       _offsetY += _gyroY;
       _offsetZ += _gyroZ;
+      _accelOffsetX += _accelX;
+      _accelOffsetY += _accelY;
+      _velocityX = 0.0;
+      _velocityY = 0.0;
     });
     await _saveSetting('offset_x', _offsetX);
     await _saveSetting('offset_y', _offsetY);
     await _saveSetting('offset_z', _offsetZ);
+    await _saveSetting('accel_offset_x', _accelOffsetX);
+    await _saveSetting('accel_offset_y', _accelOffsetY);
     _showSnackBar("Wykalibrowano pozycję ZERO! 🎯");
   }
 
@@ -425,11 +506,17 @@ class _DashboardPageState extends State<DashboardPage> {
       _offsetX = 0.0;
       _offsetY = 0.0;
       _offsetZ = 0.0;
+      _accelOffsetX = 0.0;
+      _accelOffsetY = 0.0;
+      _velocityX = 0.0;
+      _velocityY = 0.0;
     });
     await _saveSetting('offset_x', 0.0);
     await _saveSetting('offset_y', 0.0);
     await _saveSetting('offset_z', 0.0);
-    _showSnackBar("Reset offsets zakończony!");
+    await _saveSetting('accel_offset_x', 0.0);
+    await _saveSetting('accel_offset_y', 0.0);
+    _showSnackBar("Wyczyszczono offsety!");
   }
 
   void _disconnect() async {
@@ -464,6 +551,165 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // Calibration Wizard Dialog
+  void _startCalibrationWizard() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF12161E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: Row(
+                children: [
+                  const Icon(Icons.auto_awesome, color: Color(0xFF22C55E)),
+                  const SizedBox(width: 10),
+                  const Text('Kreator Kalibracji', style: TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Krok 1: Wybierz tryb pracy myszki',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              _mouseMode = MouseMode.air;
+                            });
+                            setState(() {});
+                            _saveSetting('mouse_mode', 0);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: _mouseMode == MouseMode.air 
+                                  ? const Color(0xFF22C55E).withOpacity(0.15) 
+                                  : Colors.white.withOpacity(0.02),
+                              border: Border.all(
+                                color: _mouseMode == MouseMode.air 
+                                    ? const Color(0xFF22C55E) 
+                                    : Colors.white.withOpacity(0.08),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.mouse, color: Color(0xFF22C55E)),
+                                SizedBox(height: 6),
+                                Text('Powietrzny', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text('Ruch w powietrzu', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setDialogState(() {
+                              _mouseMode = MouseMode.table;
+                            });
+                            setState(() {});
+                            _saveSetting('mouse_mode', 1);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: _mouseMode == MouseMode.table 
+                                  ? const Color(0xFF22C55E).withOpacity(0.15) 
+                                  : Colors.white.withOpacity(0.02),
+                              border: Border.all(
+                                color: _mouseMode == MouseMode.table 
+                                    ? const Color(0xFF22C55E) 
+                                    : Colors.white.withOpacity(0.08),
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Column(
+                              children: [
+                                Icon(Icons.layers, color: Color(0xFF3B82F6)),
+                                SizedBox(height: 6),
+                                Text('Stołowy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text('Przesuwaj po stole', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Krok 2: Gdzie celuje przycisk?',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButton<ButtonOrientation>(
+                    value: _buttonOrientation,
+                    dropdownColor: const Color(0xFF1E293B),
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(value: ButtonOrientation.left, child: Text('Czerwony guzik celuje w LEWO')),
+                      DropdownMenuItem(value: ButtonOrientation.front, child: Text('Czerwony guzik celuje DO MNIE')),
+                      DropdownMenuItem(value: ButtonOrientation.right, child: Text('Czerwony guzik celuje w PRAWO')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          _buttonOrientation = val;
+                        });
+                        setState(() {});
+                        _saveSetting('button_orientation', val.index);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Krok 3: Wyznacz Zero',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Połóż kapsel płasko na stabilnej nawierzchni i kliknij przycisk poniżej, aby zresetować pozycję startową.',
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6)),
+                    onPressed: () {
+                      _calibrateZero();
+                      _showSnackBar("Układ odniesienia skalibrowany! 🎯");
+                    },
+                    child: const Text('Kalibruj teraz'),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('ZAMKNIJ', style: TextStyle(color: Color(0xFF22C55E), fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isConnected = _connectionState == BluetoothConnectionState.connected;
@@ -476,7 +722,7 @@ class _DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_accessibility),
-            tooltip: 'Ustawienia Dostępności',
+            tooltip: 'Usługa Dostępności',
             onPressed: () {
               _mouseChannel.invokeMethod('openAccessibilitySettings');
             },
@@ -586,7 +832,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _buildValueCard('Ramki', '$_receivedFrames'),
+                            child: _buildValueCard('Myszka', _mouseMode == MouseMode.air ? 'Powietrzna' : 'Stołowa'),
                           ),
                         ],
                       ),
@@ -596,40 +842,73 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               const SizedBox(height: 16),
 
+              // Calibration Wizard Activation button
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3B82F6),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text('Uruchom Kreator Kalibracji i Trybu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                onPressed: _startCalibrationWizard,
+              ),
+              const SizedBox(height: 16),
+
               // Service Status Panel
               _buildGlassPanel(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Usługa Myszki (Accessibility)',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Sterowanie systemowe (Mysz)',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _isAccessibilityServiceRunning 
+                                    ? 'Kursor aktywny na ekranie' 
+                                    : 'Brak uprawnień dostępności',
+                                style: TextStyle(
+                                  color: _isAccessibilityServiceRunning ? const Color(0xFF22C55E) : Colors.redAccent,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _isAccessibilityServiceRunning 
-                                ? 'Włączona - Kursor aktywny' 
-                                : 'Wyłączona - Kliknij ikonę u góry, by włączyć',
-                            style: TextStyle(
-                              color: _isAccessibilityServiceRunning ? const Color(0xFF22C55E) : Colors.redAccent,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        Switch(
+                          value: _mouseEnabled,
+                          activeColor: const Color(0xFF22C55E),
+                          onChanged: (val) {
+                            setState(() {
+                              _mouseEnabled = val;
+                            });
+                            _saveSetting('mouse_enabled', val);
+                          },
+                        ),
+                      ],
                     ),
-                    Switch(
-                      value: _mouseEnabled,
+                    const Divider(height: 24, color: Colors.white12),
+                    SwitchListTile(
+                      title: const Text('Obsługa fizycznego przycisku', style: TextStyle(fontSize: 14)),
+                      subtitle: const Text('Kliknięcie przycisku na kapslu działa jak klik na telefonie', style: TextStyle(fontSize: 11)),
+                      value: _physicalButtonClick,
                       activeColor: const Color(0xFF22C55E),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
                       onChanged: (val) {
                         setState(() {
-                          _mouseEnabled = val;
+                          _physicalButtonClick = val;
                         });
-                        _saveSetting('mouse_enabled', val);
+                        _saveSetting('physical_button_click', val);
                       },
                     ),
                   ],
@@ -637,35 +916,38 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               const SizedBox(height: 16),
 
-              // Sensor visualization panel (Live readings)
+              // Live Telemetry
               _buildGlassPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Sensory w Czasie Rzeczywistym', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Odczyty telemetryczne', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
-                    _buildSensorBar('Gyro X (Pitch)', _gyroX, -250, 250, Colors.redAccent),
-                    _buildSensorBar('Gyro Y (Roll)', _gyroY, -250, 250, Colors.greenAccent),
-                    _buildSensorBar('Gyro Z (Yaw)', _gyroZ, -250, 250, Colors.blueAccent),
-                    const Divider(height: 24, color: Colors.white12),
-                    _buildSensorBar('Accel X', _accelX, -2.0, 2.0, Colors.orangeAccent),
-                    _buildSensorBar('Accel Y', _accelY, -2.0, 2.0, Colors.pinkAccent),
-                    _buildSensorBar('Accel Z', _accelZ, -2.0, 2.0, Colors.purpleAccent),
+                    _buildSensorBar('Żyroskop X (Pitch)', _gyroX, -200, 200, Colors.redAccent),
+                    _buildSensorBar('Żyroskop Z (Yaw)', _gyroZ, -200, 200, Colors.blueAccent),
+                    const Divider(height: 20, color: Colors.white12),
+                    _buildSensorBar('Akcelerometr X', _accelX, -1.5, 1.5, Colors.orangeAccent),
+                    _buildSensorBar('Akcelerometr Y', _accelY, -1.5, 1.5, Colors.pinkAccent),
+                    _buildSensorBar('Akcelerometr Z', _accelZ, -1.5, 1.5, Colors.purpleAccent),
+                    if (_mouseMode == MouseMode.table) ...[
+                      const Divider(height: 20, color: Colors.white12),
+                      _buildSensorBar('Lokalna prędkość X', _velocityX, -1.0, 1.0, Colors.tealAccent),
+                      _buildSensorBar('Lokalna prędkość Y', _velocityY, -1.0, 1.0, Colors.tealAccent),
+                    ]
                   ],
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Configuration settings panel
+              // Configuration
               _buildGlassPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Ustawienia i Kalibracja', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Dostrajanie czułości', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
-                    
                     _buildSlider(
-                      title: 'Czułość osi X (Poziomo)',
+                      title: 'Czułość osi X',
                       val: _sensitivityX,
                       min: 0.1,
                       max: 4.0,
@@ -674,9 +956,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         _saveSetting('sensitivity_x', v);
                       },
                     ),
-                    
                     _buildSlider(
-                      title: 'Czułość osi Y (Pionowo)',
+                      title: 'Czułość osi Y',
                       val: _sensitivityY,
                       min: 0.1,
                       max: 4.0,
@@ -685,54 +966,17 @@ class _DashboardPageState extends State<DashboardPage> {
                         _saveSetting('sensitivity_y', v);
                       },
                     ),
-
-                    _buildSlider(
-                      title: 'Martwa strefa (Deadzone)',
-                      val: _deadzone,
-                      min: 0.0,
-                      max: 0.8,
-                      onChanged: (v) {
-                        setState(() => _deadzone = v);
-                        _saveSetting('deadzone', v);
-                      },
-                    ),
-
-                    const Divider(height: 24, color: Colors.white12),
-
-                    // Toggles
-                    SwitchListTile(
-                      title: const Text('Kliknięcie stuknięciem (Z-Shock)', style: TextStyle(fontSize: 14)),
-                      subtitle: const Text('Mocne puknięcie w kapsel działa jak kliknięcie', style: TextStyle(fontSize: 11)),
-                      value: _accelTapClick,
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (val) {
-                        setState(() => _accelTapClick = val);
-                        _saveSetting('accel_tap_click', val);
-                      },
-                    ),
-
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFF3B82F6)),
-                              foregroundColor: const Color(0xFF3B82F6),
-                            ),
-                            icon: const Icon(Icons.center_focus_strong),
-                            label: const Text('Zatwierdź Zero (Tare)'),
-                            onPressed: isConnected ? _calibrateZero : null,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        OutlinedButton(
-                          onPressed: isConnected ? _resetOffsets : null,
-                          child: const Text('Resetuj'),
-                        ),
-                      ],
-                    ),
+                    if (_mouseMode == MouseMode.air)
+                      _buildSlider(
+                        title: 'Martwa strefa (Deadzone)',
+                        val: _deadzone,
+                        min: 0.0,
+                        max: 0.8,
+                        onChanged: (v) {
+                          setState(() => _deadzone = v);
+                          _saveSetting('deadzone', v);
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -814,7 +1058,7 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
         ],
       ),
     );
