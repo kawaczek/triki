@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +16,7 @@ class TrikiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Triki Mouse',
+      title: 'Triki-myszka',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0A0C10),
@@ -154,7 +155,10 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     if (_savedDeviceId != null) {
-      _connectToSavedDevice();
+      // Run connection in background so it doesn't block UI initialize
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _connectToSavedDevice();
+      });
     }
   }
 
@@ -212,8 +216,6 @@ class _DashboardPageState extends State<DashboardPage> {
     await FlutterBluePlus.stopScan();
   }
 
-  // Connects directly to the saved device without scanning, using autoConnect: true
-  // This is highly efficient and connects instantly as soon as the cap is turned on!
   void _connectToSavedDevice() async {
     if (_savedDeviceId == null) return;
     _showSnackBar("Oczekiwanie na włączenie zapisanego kapsla... 🐾");
@@ -234,13 +236,10 @@ class _DashboardPageState extends State<DashboardPage> {
           _discoverServices(device);
         } else if (state == BluetoothConnectionState.disconnected) {
           _cleanupConnection();
-          // Retry background autoConnect in case of disconnect
           _connectToSavedDevice();
         }
       });
 
-      // autoConnect: true instructs Android OS to monitor for the device advertisement
-      // and establish connection immediately in the background once it wakes up!
       await device.connect(autoConnect: true);
     } catch (e) {
       setState(() {
@@ -257,7 +256,6 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     try {
-      // Direct connection
       await device.connect(autoConnect: false).timeout(const Duration(seconds: 8));
       _connectedDevice = device;
       
@@ -278,7 +276,6 @@ class _DashboardPageState extends State<DashboardPage> {
           _discoverServices(device);
         } else if (state == BluetoothConnectionState.disconnected) {
           _cleanupConnection();
-          // If disconnected, switch to background auto-reconnect
           _connectToSavedDevice();
         }
       });
@@ -302,6 +299,91 @@ class _DashboardPageState extends State<DashboardPage> {
       _savedDeviceName = null;
     });
     _showSnackBar("Zapomniano zapisane urządzenie!");
+  }
+
+  // Renames the capsule in the app, and optionally attempts to write to the BLE Generic Access Service (0x1800 -> 0x2A00)
+  Future<void> _renameCapsule(String newName) async {
+    if (newName.trim().isEmpty) return;
+    
+    // 1. Save custom nickname locally in App SharedPreferences
+    await _saveSetting('saved_device_name', newName);
+    setState(() {
+      _savedDeviceName = newName;
+    });
+
+    bool hardwareSuccess = false;
+
+    // 2. Try to update hardware BLE name if connected
+    if (_connectedDevice != null && _connectionState == BluetoothConnectionState.connected) {
+      try {
+        List<BluetoothService> services = await _connectedDevice!.discoverServices();
+        const genericAccessUuid = "1800";
+        const deviceNameUuid = "2a00";
+
+        BluetoothService? accessService;
+        for (var s in services) {
+          if (s.uuid.toString().toLowerCase().contains(genericAccessUuid)) {
+            accessService = s;
+            break;
+          }
+        }
+
+        if (accessService != null) {
+          for (var c in accessService.characteristics) {
+            if (c.uuid.toString().toLowerCase().contains(deviceNameUuid)) {
+              // Write new name bytes
+              await c.write(utf8.encode(newName), timeout: 5);
+              hardwareSuccess = true;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("Hardware device name update failed (probably read-only): $e");
+      }
+    }
+
+    if (hardwareSuccess) {
+      _showSnackBar("Zmieniono nazwę w aplikacji oraz w pamięci kapsla! 🔴✨");
+    } else {
+      _showSnackBar("Zmieniono nazwę lokalną w aplikacji! 🐾");
+    }
+  }
+
+  void _showRenameDialog() {
+    final controller = TextEditingController(text: _savedDeviceName ?? "Triki");
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF12161E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text("Zmień nazwę kapsla", style: TextStyle(fontWeight: FontWeight.bold)),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: "Wpisz nową nazwę",
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white30)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF22C55E))),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("ANULUJ", style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () {
+                _renameCapsule(controller.text);
+                Navigator.of(context).pop();
+              },
+              child: const Text("ZAPISZ", style: TextStyle(color: Color(0xFF22C55E), fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _discoverServices(BluetoothDevice device) async {
@@ -610,7 +692,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Triki Mouse Dashboard 🐾', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Triki-myszka Dashboard 🐾', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -664,10 +746,23 @@ class _DashboardPageState extends State<DashboardPage> {
                                     const Icon(Icons.bookmark, color: Color(0xFF22C55E), size: 14),
                                     const SizedBox(width: 4),
                                     Expanded(
-                                      child: Text(
-                                        'Zapisany: ${_savedDeviceName ?? "Kapsel"} (${_savedDeviceId!.substring(0, min(17, _savedDeviceId!.length))})',
-                                        style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                                        overflow: TextOverflow.ellipsis,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              'Zapisany: ${_savedDeviceName ?? "Kapsel"} (${_savedDeviceId!.substring(0, min(17, _savedDeviceId!.length))})',
+                                              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 16),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            onPressed: _showRenameDialog,
+                                            tooltip: "Zmień nazwę",
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -994,36 +1089,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildSensorBar(String label, double val, double minVal, double maxVal, Color c) {
-    double progress = (val - minVal) / (maxVal - minVal);
-    progress = progress.clamp(0.0, 1.0);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              Text(val.toStringAsFixed(2), style: const TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(100),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.white.withOpacity(0.05),
-              valueColor: AlwaysStoppedAnimation<Color>(c),
-              minHeight: 6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSensorBarHorizontal(String label, double val, double minVal, double maxVal, Color c) {
     double progress = (val - minVal) / (maxVal - minVal);
     progress = progress.clamp(0.0, 1.0);
     return Padding(

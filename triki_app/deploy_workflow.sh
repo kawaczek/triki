@@ -29,7 +29,8 @@ else
     echo "Tworzenie commitu..."
     git commit -m "Automatyczny deploy: nowa wersja APK i aktualizacja kodu źródłowego ($(date '+%Y-%m-%d %H:%M:%S'))"
     
-    echo "=== [4/4] Wypychanie zmian do Gitea (HTTPS) ==="
+    echo "=== [4/4] Wypychanie zmian do Gitea (HTTPS) i GitHub ==="
     git push origin main
+    git push github main
     echo "=== Wdrożenie zakończone sukcesem! 🐾 ==="
 fi
