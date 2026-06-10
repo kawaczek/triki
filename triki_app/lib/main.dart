@@ -61,8 +61,8 @@ class _DashboardPageState extends State<DashboardPage> {
   double _sensitivityY = 1.2;
   double _deadzone = 0.15;
   bool _mouseEnabled = true;
-  bool _accelTapClick = false; // Turned off by default in favor of physical button
-  bool _physicalButtonClick = true; // Use physical button!
+  bool _accelTapClick = false; 
+  bool _physicalButtonClick = true; 
 
   // Mouse Mode & Orientation
   MouseMode _mouseMode = MouseMode.air;
@@ -313,7 +313,6 @@ class _DashboardPageState extends State<DashboardPage> {
     while (_rxBuffer.length >= 14) {
       int headerIdx = -1;
       for (int i = 0; i < _rxBuffer.length - 1; i++) {
-        // Look for header 0x22
         if (_rxBuffer[i] == 0x22) {
           headerIdx = i;
           break;
@@ -350,9 +349,6 @@ class _DashboardPageState extends State<DashboardPage> {
     _receivedFrames++;
     _fpsCounter++;
 
-    // Parse values
-    // Byte 0: 0x22
-    // Byte 1: Button state! (0x00 = released, 0x01 = pressed)
     final btnState = frame[1];
     final rawGx = _readInt16LE(frame, 2);
     final rawGy = _readInt16LE(frame, 4);
@@ -361,7 +357,6 @@ class _DashboardPageState extends State<DashboardPage> {
     final rawAy = _readInt16LE(frame, 10);
     final rawAz = _readInt16LE(frame, 12);
 
-    // Scaling
     double gx = rawGx / 131.0 - _offsetX;
     double gy = rawGy / 131.0 - _offsetY;
     double gz = rawGz / 131.0 - _offsetZ;
@@ -370,11 +365,9 @@ class _DashboardPageState extends State<DashboardPage> {
     double ay = rawAy / 2048.0 - _accelOffsetY;
     double az = rawAz / 2048.0;
 
-    // Handle physical button click transitions
     if (_physicalButtonClick) {
       bool pressed = btnState != 0x00;
       if (pressed && !_isButtonPressed) {
-        // Button pressed transition (Click)
         _isButtonPressed = true;
         _triggerSystemClick();
       } else if (!pressed && _isButtonPressed) {
@@ -391,7 +384,6 @@ class _DashboardPageState extends State<DashboardPage> {
       _accelZ = az;
     });
 
-    // Z-Shock click detection (alternative)
     if (_accelTapClick) {
       double diffZ = (az - _lastAccelZ).abs();
       if (diffZ > 0.9) {
@@ -404,37 +396,31 @@ class _DashboardPageState extends State<DashboardPage> {
       _lastAccelZ = az;
     }
 
-    // Remap axes based on physical red button direction
     double inputGx = gx;
     double inputGz = gz;
     double inputAx = ax;
     double inputAy = ay;
 
     if (_buttonOrientation == ButtonOrientation.front) {
-      // Button points towards user
       inputGx = gy;
       inputGz = -gx;
       inputAx = ay;
       inputAy = -ax;
     } else if (_buttonOrientation == ButtonOrientation.right) {
-      // Button points right
       inputGx = -gx;
       inputGz = -gz;
       inputAx = -ax;
       inputAy = -ay;
     }
 
-    // Air Mouse vs Table Mouse logic
     if (_mouseEnabled && _isAccessibilityServiceRunning) {
       double dx = 0.0;
       double dy = 0.0;
 
       if (_mouseMode == MouseMode.air) {
-        // Air mode: Yaw / Gz determines horizontal, Pitch / Gx determines vertical
         dx = -inputGz * _sensitivityX;
         dy = inputGx * _sensitivityY;
 
-        // Apply deadzone
         if (dx.abs() < _deadzone) dx = 0;
         if (dy.abs() < _deadzone) dy = 0;
 
@@ -442,9 +428,6 @@ class _DashboardPageState extends State<DashboardPage> {
           _mouseChannel.invokeMethod('moveCursor', {'dx': dx, 'dy': dy});
         }
       } else {
-        // Table mode: uses accelerometer translation!
-        // We integrate acceleration to find velocity, and apply friction damping to auto-zero
-        // Deadzone filters out sensor noise
         double accThreshold = 0.08;
         double inputX = inputAx;
         double inputY = inputAy;
@@ -452,13 +435,11 @@ class _DashboardPageState extends State<DashboardPage> {
         if (inputX.abs() < accThreshold) inputX = 0.0;
         if (inputY.abs() < accThreshold) inputY = 0.0;
 
-        // Friction damping factor (clears movement when stationary)
         const friction = 0.82;
 
         _velocityX = (_velocityX + inputX * 9.81 * 0.02) * friction;
-        _velocityY = (_velocityY - inputY * 9.81 * 0.02) * friction; // Invert Y for screen coordinates
+        _velocityY = (_velocityY - inputY * 9.81 * 0.02) * friction; 
 
-        // Scale velocity to cursor steps
         dx = _velocityX * _sensitivityX * 25.0;
         dy = _velocityY * _sensitivityY * 25.0;
 
@@ -498,7 +479,6 @@ class _DashboardPageState extends State<DashboardPage> {
     await _saveSetting('offset_z', _offsetZ);
     await _saveSetting('accel_offset_x', _accelOffsetX);
     await _saveSetting('accel_offset_y', _accelOffsetY);
-    _showSnackBar("Wykalibrowano pozycję ZERO! 🎯");
   }
 
   void _resetOffsets() async {
@@ -551,159 +531,24 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Calibration Wizard Dialog
   void _startCalibrationWizard() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierDismissible: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF12161E),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              title: Row(
-                children: [
-                  const Icon(Icons.auto_awesome, color: Color(0xFF22C55E)),
-                  const SizedBox(width: 10),
-                  const Text('Kreator Kalibracji', style: TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Krok 1: Wybierz tryb pracy myszki',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            setDialogState(() {
-                              _mouseMode = MouseMode.air;
-                            });
-                            setState(() {});
-                            _saveSetting('mouse_mode', 0);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                            decoration: BoxDecoration(
-                              color: _mouseMode == MouseMode.air 
-                                  ? const Color(0xFF22C55E).withOpacity(0.15) 
-                                  : Colors.white.withOpacity(0.02),
-                              border: Border.all(
-                                color: _mouseMode == MouseMode.air 
-                                    ? const Color(0xFF22C55E) 
-                                    : Colors.white.withOpacity(0.08),
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Column(
-                              children: [
-                                Icon(Icons.mouse, color: Color(0xFF22C55E)),
-                                SizedBox(height: 6),
-                                Text('Powietrzny', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                Text('Ruch w powietrzu', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () {
-                            setDialogState(() {
-                              _mouseMode = MouseMode.table;
-                            });
-                            setState(() {});
-                            _saveSetting('mouse_mode', 1);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                            decoration: BoxDecoration(
-                              color: _mouseMode == MouseMode.table 
-                                  ? const Color(0xFF22C55E).withOpacity(0.15) 
-                                  : Colors.white.withOpacity(0.02),
-                              border: Border.all(
-                                color: _mouseMode == MouseMode.table 
-                                    ? const Color(0xFF22C55E) 
-                                    : Colors.white.withOpacity(0.08),
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Column(
-                              children: [
-                                Icon(Icons.layers, color: Color(0xFF3B82F6)),
-                                SizedBox(height: 6),
-                                Text('Stołowy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                Text('Przesuwaj po stole', style: TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Krok 2: Gdzie celuje przycisk?',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButton<ButtonOrientation>(
-                    value: _buttonOrientation,
-                    dropdownColor: const Color(0xFF1E293B),
-                    isExpanded: true,
-                    items: const [
-                      DropdownMenuItem(value: ButtonOrientation.left, child: Text('Czerwony guzik celuje w LEWO')),
-                      DropdownMenuItem(value: ButtonOrientation.front, child: Text('Czerwony guzik celuje DO MNIE')),
-                      DropdownMenuItem(value: ButtonOrientation.right, child: Text('Czerwony guzik celuje w PRAWO')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          _buttonOrientation = val;
-                        });
-                        setState(() {});
-                        _saveSetting('button_orientation', val.index);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Krok 3: Wyznacz Zero',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Połóż kapsel płasko na stabilnej nawierzchni i kliknij przycisk poniżej, aby zresetować pozycję startową.',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B82F6)),
-                    onPressed: () {
-                      _calibrateZero();
-                      _showSnackBar("Układ odniesienia skalibrowany! 🎯");
-                    },
-                    child: const Text('Kalibruj teraz'),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('ZAMKNIJ', style: TextStyle(color: Color(0xFF22C55E), fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
+        return CalibrationWizardSheet(
+          initialMode: _mouseMode,
+          initialOrientation: _buttonOrientation,
+          onFinish: (mode, orientation) {
+            setState(() {
+              _mouseMode = mode;
+              _buttonOrientation = orientation;
+            });
+            _saveSetting('mouse_mode', mode.index);
+            _saveSetting('button_orientation', orientation.index);
+            _calibrateZero();
+            _showSnackBar("Zapisano ustawienia i wykalibrowano! 🎯");
           },
         );
       },
@@ -747,7 +592,6 @@ class _DashboardPageState extends State<DashboardPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Device status card
               _buildGlassPanel(
                 child: Column(
                   children: [
@@ -842,7 +686,6 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               const SizedBox(height: 16),
 
-              // Calibration Wizard Activation button
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3B82F6),
@@ -856,7 +699,6 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               const SizedBox(height: 16),
 
-              // Service Status Panel
               _buildGlassPanel(
                 child: Column(
                   children: [
@@ -916,7 +758,6 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               const SizedBox(height: 16),
 
-              // Live Telemetry
               _buildGlassPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -939,7 +780,6 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               const SizedBox(height: 16),
 
-              // Configuration
               _buildGlassPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1130,4 +970,555 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
+}
+
+// Visual Interactive Calibration Wizard with Custom Animations and Painters
+class CalibrationWizardSheet extends StatefulWidget {
+  final MouseMode initialMode;
+  final ButtonOrientation initialOrientation;
+  final Function(MouseMode, ButtonOrientation) onFinish;
+
+  const CalibrationWizardSheet({
+    super.key,
+    required this.initialMode,
+    required this.initialOrientation,
+    required this.onFinish,
+  });
+
+  @override
+  State<CalibrationWizardSheet> createState() => _CalibrationWizardSheetState();
+}
+
+class _CalibrationWizardSheetState extends State<CalibrationWizardSheet> {
+  final PageController _pageController = PageController();
+  int _currentStep = 0;
+
+  late MouseMode _mode;
+  late ButtonOrientation _orientation;
+  
+  bool _calibrating = false;
+  double _calibrationProgress = 0.0;
+  Timer? _calibrationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _mode = widget.initialMode;
+    _orientation = widget.initialOrientation;
+  }
+
+  @override
+  void dispose() {
+    _calibrationTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _nextStep() {
+    if (_currentStep < 3) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      widget.onFinish(_mode, _orientation);
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _prevStep() {
+    if (_currentStep > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _runCalibration() {
+    setState(() {
+      _calibrating = true;
+      _calibrationProgress = 0.0;
+    });
+
+    _calibrationTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      setState(() {
+        _calibrationProgress += 0.05;
+        if (_calibrationProgress >= 1.0) {
+          _calibrationProgress = 1.0;
+          _calibrating = false;
+          _calibrationTimer?.cancel();
+          _nextStep();
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F131A),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
+        ),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white38,
+              borderRadius: BorderRadius.circular(100),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Konfiguracja Kapsla Triki',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                Text(
+                  'Krok ${_currentStep + 1} z 4',
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(100),
+              child: LinearProgressIndicator(
+                value: (_currentStep + 1) / 4,
+                minHeight: 4,
+                backgroundColor: Colors.white.withOpacity(0.05),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
+              ),
+            ),
+          ),
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              onPageChanged: (idx) {
+                setState(() {
+                  _currentStep = idx;
+                });
+              },
+              children: [
+                _buildModeSelectStep(),
+                _buildOrientationSelectStep(),
+                _buildCalibrationStep(),
+                _buildFinishedStep(),
+              ],
+            ),
+          ),
+          _buildNavButtons(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeSelectStep() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Jak chcesz używać kapsla?',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Wybierz tryb pracy dopasowany do Twoich potrzeb.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildModeCard(
+                    mode: MouseMode.air,
+                    title: 'Myszka Powietrzna',
+                    description: 'Trzymaj kapsel w powietrzu i obracaj nim jak wskaźnikiem laserowym. Idealne do prezentacji i kanapy.',
+                    icon: Icons.mouse,
+                    color: const Color(0xFF22C55E),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildModeCard(
+                    mode: MouseMode.table,
+                    title: 'Myszka Stołowa',
+                    description: 'Połóż kapsel na stole i przesuwaj nim w wybranym kierunku. Działa jak standardowa myszka optyczna.',
+                    icon: Icons.layers,
+                    color: const Color(0xFF3B82F6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeCard({
+    required MouseMode mode,
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+  }) {
+    final bool isSelected = _mode == mode;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _mode = mode;
+        });
+      },
+      borderRadius: BorderRadius.circular(24),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.08) : Colors.white.withOpacity(0.01),
+          border: Border.all(
+            color: isSelected ? color : Colors.white.withOpacity(0.08),
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isSelected ? color.withOpacity(0.15) : Colors.white.withOpacity(0.04),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 14),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: const TextStyle(fontSize: 10, color: Colors.grey, height: 1.4),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrientationSelectStep() {
+    double angle = 0.0;
+    if (_orientation == ButtonOrientation.left) {
+      angle = -pi / 2;
+    } else if (_orientation == ButtonOrientation.front) {
+      angle = 0.0;
+    } else if (_orientation == ButtonOrientation.right) {
+      angle = pi / 2;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Ustawienie orientacji kapsla',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Wybierz kierunek, w którym fizycznie wskazuje czerwony przycisk na boku kapsla.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: angle, end: angle),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutBack,
+                builder: (context, value, child) {
+                  return Transform.rotate(
+                    angle: value,
+                    child: CustomPaint(
+                      size: const Size(180, 180),
+                      painter: InteractiveCap2DPainter(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildOrientationButton(ButtonOrientation.left, 'W Lewo'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildOrientationButton(ButtonOrientation.front, 'Do Mnie'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildOrientationButton(ButtonOrientation.right, 'W Prawo'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrientationButton(ButtonOrientation orientation, String label) {
+    final bool isSelected = _orientation == orientation;
+    return ChoiceChip(
+      label: Container(
+        width: double.infinity,
+        alignment: Alignment.center,
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      ),
+      selected: isSelected,
+      selectedColor: const Color(0xFF22C55E).withOpacity(0.2),
+      backgroundColor: Colors.white.withOpacity(0.02),
+      onSelected: (val) {
+        if (val) {
+          setState(() {
+            _orientation = orientation;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildCalibrationStep() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Kalibracja położenia początkowego',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Połóż kapsel płasko na stabilnym podłożu. Upewnij się, że urządzenie nie drży.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 48),
+          _calibrating 
+              ? SizedBox(
+                  width: 120,
+                  height: 120,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        value: _calibrationProgress,
+                        strokeWidth: 8,
+                        color: const Color(0xFF22C55E),
+                        backgroundColor: Colors.white.withOpacity(0.05),
+                      ),
+                      Text(
+                        '${(_calibrationProgress * 100).toInt()}%',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+                )
+              : ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF22C55E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                  ),
+                  icon: const Icon(Icons.center_focus_strong),
+                  label: const Text('ROZPOCZNIJ KALIBRACJĘ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  onPressed: _runCalibration,
+                ),
+          const SizedBox(height: 24),
+          if (_calibrating)
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.grey),
+                ),
+                SizedBox(width: 10),
+                Text('Uzgadnianie żyroskopu i akcelerometru...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinishedStep() {
+    return const Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline, color: Color(0xFF22C55E), size: 80),
+          SizedBox(height: 20),
+          Text(
+            'Konfiguracja ukończona!',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Twój kapsel Triki jest teraz gotowy do sterowania systemem. Wszystkie parametry zostały zapisane w pamięci.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          if (_currentStep > 0 && _currentStep < 3 && !_calibrating)
+            TextButton(
+              onPressed: _prevStep,
+              child: const Text('WSTECZ', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            )
+          else
+            const SizedBox(),
+          if (_currentStep != 2) // Step 2 requires triggering calibration button
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF22C55E),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+              ),
+              onPressed: _nextStep,
+              child: Text(_currentStep == 3 ? 'GOTOWE' : 'DALEJ', style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// Custom 2D bottle cap painter with crown ridges and a red button
+class InteractiveCap2DPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final outerRadius = size.width / 2.2;
+    final innerRadius = outerRadius * 0.78;
+
+    final capPaint = Paint()
+      ..color = const Color(0xFF1E293B)
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = Colors.white.withOpacity(0.2)
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke;
+
+    final innerCapPaint = Paint()
+      ..color = const Color(0xFF0F172A)
+      ..style = PaintingStyle.fill;
+
+    final zappkaLabelPaint = Paint()
+      ..color = const Color(0xFF22C55E)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.fill;
+
+    // Draw ridges (cap crown look)
+    final ridgePaint = Paint()
+      ..color = Colors.white.withOpacity(0.15)
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < 24; i++) {
+      double angle = (2 * pi * i) / 24;
+      double rStart = innerRadius * 0.95;
+      double rEnd = outerRadius * 1.05;
+      
+      canvas.drawLine(
+        Offset(center.dx + rStart * cos(angle), center.dy + rStart * sin(angle)),
+        Offset(center.dx + rEnd * cos(angle), center.dy + rEnd * sin(angle)),
+        ridgePaint,
+      );
+    }
+
+    // Draw cap body base
+    canvas.drawCircle(center, outerRadius, capPaint);
+    canvas.drawCircle(center, outerRadius, borderPaint);
+
+    // Draw inner circle
+    canvas.drawCircle(center, innerRadius, innerCapPaint);
+    canvas.drawCircle(center, innerRadius, Paint()
+      ..color = const Color(0xFF22C55E).withOpacity(0.08)
+      ..style = PaintingStyle.fill);
+
+    // Draw stylized Z logo in green
+    final logoPath = Path();
+    logoPath.moveTo(center.dx - 18, center.dy - 18);
+    logoPath.lineTo(center.dx + 18, center.dy - 18);
+    logoPath.lineTo(center.dx - 18, center.dy + 18);
+    logoPath.lineTo(center.dx + 18, center.dy + 18);
+    logoPath.lineTo(center.dx + 10, center.dy + 18);
+    logoPath.lineTo(center.dx - 18, center.dy + 18);
+    logoPath.close();
+    canvas.drawPath(logoPath, zappkaLabelPaint);
+
+    // Draw physical RED button on top of cap rim
+    final buttonPaint = Paint()
+      ..color = const Color(0xFFEF4444)
+      ..style = PaintingStyle.fill;
+
+    final buttonGlowPaint = Paint()
+      ..color = const Color(0xFFEF4444).withOpacity(0.4)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+
+    // Button position: always draw at 0 angle (the build transform scales/rotates this canvas)
+    // In local space, we place the red button at right edge (0 rad)
+    final buttonCenter = Offset(center.dx + outerRadius * 1.0, center.dy);
+    canvas.drawCircle(buttonCenter, 14, buttonGlowPaint);
+    canvas.drawCircle(buttonCenter, 8, buttonPaint);
+    canvas.drawCircle(buttonCenter, 8, Paint()
+      ..color = Colors.white
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
