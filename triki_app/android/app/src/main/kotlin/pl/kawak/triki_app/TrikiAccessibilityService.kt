@@ -23,32 +23,23 @@ class TrikiAccessibilityService : AccessibilityService() {
     private var cursorView: View? = null
     private var params: WindowManager.LayoutParams? = null
 
-    // Cursor position in screen pixels
     var cursorX = 500f
     var cursorY = 1000f
 
-    // Screen dimensions
-    private var screenWidth = 1080
+    private var screenWidth  = 1080
     private var screenHeight = 2400
-
-    override fun onCreate() {
-        super.onCreate()
-        Log.d("TrikiService", "onCreate")
-    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        Log.d("TrikiService", "Service connected!")
-
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        val displayMetrics = resources.displayMetrics
-        screenWidth = displayMetrics.widthPixels
-        screenHeight = displayMetrics.heightPixels
-        cursorX = screenWidth / 2f
+        val dm = resources.displayMetrics
+        screenWidth  = dm.widthPixels
+        screenHeight = dm.heightPixels
+        cursorX = screenWidth  / 2f
         cursorY = screenHeight / 2f
-
         createCursorOverlay()
+        Log.d("TrikiService", "Service connected ${screenWidth}x${screenHeight}")
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -66,29 +57,43 @@ class TrikiAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
     override fun onInterrupt() {}
 
+    // ── Cursor overlay ──────────────────────────────────────────────────────
+
     private fun createCursorOverlay() {
         if (cursorView != null) return
+        val density = resources.displayMetrics.density
+        val size    = (30 * density).toInt()
+        val stroke  = (3  * density).toInt()
 
-        val size = (32 * resources.displayMetrics.density).toInt()
-        
         val container = FrameLayout(this)
-        val pointer = View(this).apply {
-            val strokeWidth = (3 * resources.displayMetrics.density).toInt()
-            val gd = android.graphics.drawable.GradientDrawable().apply {
+
+        // Outer ring (white glow)
+        val ring = View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.parseColor("#39FF14")) // Neon Green cursor
-                setStroke(strokeWidth, Color.WHITE)
+                setColor(Color.TRANSPARENT)
+                setStroke(stroke, Color.WHITE)
             }
-            background = gd
         }
-        
-        container.addView(pointer, FrameLayout.LayoutParams(size, size, Gravity.CENTER))
+        // Inner dot (neon green)
+        val dot = View(this).apply {
+            val innerSize = (12 * density).toInt()
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.parseColor("#22C55E"))
+            }
+            layoutParams = FrameLayout.LayoutParams(innerSize, innerSize, Gravity.CENTER)
+        }
+
+        container.addView(ring,  FrameLayout.LayoutParams(size, size, Gravity.CENTER))
+        container.addView(dot)
 
         params = WindowManager.LayoutParams(
-            size,
-            size,
+            size, size,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.LEFT
@@ -99,7 +104,6 @@ class TrikiAccessibilityService : AccessibilityService() {
         try {
             windowManager?.addView(container, params)
             cursorView = container
-            Log.d("TrikiService", "Cursor overlay created at $cursorX, $cursorY")
         } catch (e: Exception) {
             Log.e("TrikiService", "Failed to add cursor overlay", e)
         }
@@ -107,44 +111,57 @@ class TrikiAccessibilityService : AccessibilityService() {
 
     private fun removeCursorOverlay() {
         cursorView?.let {
-            try {
-                windowManager?.removeView(it)
-            } catch (e: Exception) {
-                Log.e("TrikiService", "Error removing cursor view", e)
-            }
+            try { windowManager?.removeView(it) } catch (_: Exception) {}
         }
         cursorView = null
     }
 
-    fun moveCursor(dx: Float, dy: Float) {
-        val displayMetrics = resources.displayMetrics
-        screenWidth = displayMetrics.widthPixels
-        screenHeight = displayMetrics.heightPixels
+    // ── Public actions ───────────────────────────────────────────────────────
 
+    fun moveCursor(dx: Float, dy: Float) {
+        val dm = resources.displayMetrics
+        screenWidth  = dm.widthPixels
+        screenHeight = dm.heightPixels
         cursorX = (cursorX + dx).coerceIn(0f, screenWidth.toFloat())
         cursorY = (cursorY + dy).coerceIn(0f, screenHeight.toFloat())
-
         params?.let {
-            val size = it.width
-            it.x = (cursorX - size / 2).toInt()
-            it.y = (cursorY - size / 2).toInt()
-            
-            try {
-                windowManager?.updateViewLayout(cursorView, it)
-            } catch (e: Exception) {
-                Log.e("TrikiService", "Error updating cursor position", e)
-            }
+            it.x = (cursorX - it.width  / 2).toInt()
+            it.y = (cursorY - it.height / 2).toInt()
+            try { windowManager?.updateViewLayout(cursorView, it) } catch (_: Exception) {}
         }
     }
 
     fun performClick() {
-        Log.d("TrikiService", "Performing click at $cursorX, $cursorY")
+        val path = Path().apply { moveTo(cursorX, cursorY) }
+        val stroke = GestureDescription.StrokeDescription(path, 0, 60)
+        dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+    }
+
+    fun performDoubleClick() {
+        val path1 = Path().apply { moveTo(cursorX, cursorY) }
+        val path2 = Path().apply { moveTo(cursorX, cursorY) }
+        val s1 = GestureDescription.StrokeDescription(path1, 0,   60)
+        val s2 = GestureDescription.StrokeDescription(path2, 150, 60)
+        dispatchGesture(
+            GestureDescription.Builder().addStroke(s1).addStroke(s2).build(),
+            null, null
+        )
+    }
+
+    fun performRightClick() {
+        // Long press (600ms) = system right-click on most apps
+        val path = Path().apply { moveTo(cursorX, cursorY) }
+        val stroke = GestureDescription.StrokeDescription(path, 0, 600)
+        dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+    }
+
+    fun performScroll(dx: Float, dy: Float) {
+        val dist = 250f
         val path = Path().apply {
             moveTo(cursorX, cursorY)
+            lineTo(cursorX + dx * dist, cursorY + dy * dist)
         }
-        val builder = GestureDescription.Builder()
-        val stroke = GestureDescription.StrokeDescription(path, 0, 50)
-        builder.addStroke(stroke)
-        dispatchGesture(builder.build(), null, null)
+        val stroke = GestureDescription.StrokeDescription(path, 0, 200)
+        dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
     }
 }
