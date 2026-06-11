@@ -244,42 +244,61 @@ function startCalib() {
   return new Promise(resolve => {
     if (!triki.connected) { showToast('Najpierw podłącz kapsla'); resolve(null); return; }
 
-    // Wyczyść pending klik (żeby nie zaliczyć kroku 1 od razu)
-    triki.consumeClick();
+    triki.consumeClick();  // flush any pending click — krok nie może odpalić się sam
 
     const ov = document.createElement('div');
     ov.style.cssText = [
       'position:fixed;inset:0;background:rgba(6,8,16,.97);z-index:10000',
       'display:flex;flex-direction:column;align-items:center;justify-content:center',
-      'padding:36px;gap:16px;text-align:center;font-family:Outfit,sans-serif',
+      'padding:32px;gap:10px;text-align:center;font-family:Outfit,sans-serif',
     ].join(';');
     ov.innerHTML = `
-      <div id="_c_icon" style="font-size:68px;line-height:1.1;transition:transform .25s"></div>
-      <div id="_c_step" style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:2.5px;text-transform:uppercase;margin-top:4px">KALIBRACJA</div>
-      <div id="_c_msg"  style="font-size:21px;font-weight:800;color:#fff;max-width:290px;line-height:1.25"></div>
-      <div id="_c_sub"  style="font-size:13px;color:rgba(255,255,255,.45);max-width:270px;line-height:1.5"></div>
-      <div style="width:220px;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin:2px 0">
+      <div id="_c_icon" style="font-size:56px;line-height:1.1"></div>
+      <div id="_c_step" style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:2.5px;text-transform:uppercase">KALIBRACJA</div>
+      <div id="_c_msg"  style="font-size:19px;font-weight:800;color:#fff;max-width:280px;line-height:1.25"></div>
+      <div id="_c_sub"  style="font-size:12px;color:rgba(255,255,255,.42);max-width:260px;line-height:1.5"></div>
+
+      <!-- WIZUALIZATOR PRZECHYŁU -->
+      <div style="position:relative;width:130px;height:130px;flex-shrink:0;margin:4px 0">
+        <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.12)">
+          <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,255,255,.07)"></div>
+          <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.07)"></div>
+        </div>
+        <div id="_c_tring" style="position:absolute;border-radius:50%;pointer-events:none"></div>
+        <div id="_c_dot"   style="position:absolute;width:14px;height:14px;border-radius:50%;pointer-events:none;box-shadow:0 0 8px currentColor;transition:background .12s"></div>
+      </div>
+      <div id="_c_tval" style="font-size:10px;color:rgba(255,255,255,.28);font-family:monospace;min-height:15px;letter-spacing:.4px"></div>
+
+      <div style="width:220px;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">
         <div id="_c_prog" style="height:100%;width:0%;background:#22c55e;transition:width .35s ease"></div>
       </div>
       <div id="_c_warn" style="font-size:12px;color:#f59e0b;font-weight:600;min-height:18px"></div>
       <button id="_c_skip" style="
-        margin-top:8px;padding:9px 26px;border-radius:10px;
+        margin-top:4px;padding:9px 26px;border-radius:10px;
         border:1px solid rgba(255,255,255,.15);background:transparent;
-        color:rgba(255,255,255,.35);font-size:12px;font-family:Outfit,sans-serif;
+        color:rgba(255,255,255,.32);font-size:12px;font-family:Outfit,sans-serif;
         cursor:pointer;letter-spacing:.5px;
       ">POMIŃ</button>
     `;
     document.body.appendChild(ov);
 
-    const iconEl = ov.querySelector('#_c_icon');
-    const stepEl = ov.querySelector('#_c_step');
-    const msgEl  = ov.querySelector('#_c_msg');
-    const subEl  = ov.querySelector('#_c_sub');
-    const progEl = ov.querySelector('#_c_prog');
-    const warnEl = ov.querySelector('#_c_warn');
+    const iconEl  = ov.querySelector('#_c_icon');
+    const stepEl  = ov.querySelector('#_c_step');
+    const msgEl   = ov.querySelector('#_c_msg');
+    const subEl   = ov.querySelector('#_c_sub');
+    const progEl  = ov.querySelector('#_c_prog');
+    const warnEl  = ov.querySelector('#_c_warn');
+    const dotEl   = ov.querySelector('#_c_dot');
+    const tringEl = ov.querySelector('#_c_tring');
+    const tvalEl  = ov.querySelector('#_c_tval');
+
+    const CENTER = 65;   // px, połowa 130px okręgu
+    const SCALE  = 95;   // px per 1g
+    const GOOD_G = 0.15; // zalecany przechył (okrąg docelowy)
 
     let rafId;
     let currentStep = 1;
+    let btnReady = false;  // true dopiero po jednej klatce bez kliknięcia — dodatkowe zabezpieczenie
 
     function finish(success) {
       cancelAnimationFrame(rafId);
@@ -291,34 +310,82 @@ function startCalib() {
 
     function showStep1() {
       currentStep = 1;
-      iconEl.textContent   = '🤚';
-      stepEl.textContent   = 'KROK 1 / 2  ·  KALIBRACJA';
-      msgEl.textContent    = 'Trzymaj kapsla jak chcesz grać';
-      subEl.textContent    = 'Ustaw kapsel w swojej naturalnej pozycji trzymania, potem wciśnij przycisk na kapslu';
-      progEl.style.width   = '0%';
-      warnEl.textContent   = '';
+      btnReady = false;
+      iconEl.textContent = '🤚';
+      stepEl.textContent = 'KROK 1 / 2  ·  KALIBRACJA';
+      msgEl.textContent  = 'Trzymaj kapsla jak chcesz grać';
+      subEl.textContent  = 'Ustaw kapsel w naturalnej pozycji trzymania, potem wciśnij przycisk';
+      progEl.style.width = '0%';
+      warnEl.textContent = '';
+      tringEl.style.cssText = 'position:absolute;pointer-events:none;border:none';
     }
 
     function showStep2() {
       currentStep = 2;
-      iconEl.textContent   = '➡️';
-      stepEl.textContent   = 'KROK 2 / 2  ·  KALIBRACJA';
-      msgEl.textContent    = 'Przechyl mocno W PRAWO';
-      subEl.textContent    = 'Wciśnij przycisk trzymając kapsel wyraźnie pochylony w prawo';
-      progEl.style.width   = '50%';
-      warnEl.textContent   = '';
+      btnReady = false;
+      iconEl.textContent = '➡️';
+      stepEl.textContent = 'KROK 2 / 2  ·  KALIBRACJA';
+      msgEl.textContent  = 'Przechyl mocno W PRAWO';
+      subEl.textContent  = 'Poczekaj aż kropka wyjdzie za okrąg, potem wciśnij przycisk';
+      progEl.style.width = '50%';
+      warnEl.textContent = '';
     }
 
     function showDone() {
-      iconEl.textContent   = '✅';
-      stepEl.textContent   = 'GOTOWE!';
-      msgEl.textContent    = 'Kalibracja zapisana';
-      subEl.textContent    = 'Zaczynamy grę…';
-      progEl.style.width   = '100%';
-      warnEl.textContent   = '';
+      iconEl.textContent = '✅';
+      stepEl.textContent = 'GOTOWE!';
+      msgEl.textContent  = 'Kalibracja zapisana';
+      subEl.textContent  = 'Zaczynamy grę…';
+      progEl.style.width = '100%';
+      warnEl.textContent = '';
+      tringEl.style.cssText = 'position:absolute;pointer-events:none;border:none';
+    }
+
+    function updateTiltViz() {
+      // krok 1: wartości absolutne; krok 2: delta od neutral
+      const nx = triki._calibNeut?.ax ?? 0;
+      const ny = triki._calibNeut?.ay ?? 0;
+      const vx = currentStep === 1 ? triki.ax       : triki.ax - nx;
+      const vy = currentStep === 1 ? triki.ay       : triki.ay - ny;
+      const len = Math.hypot(vx, vy);
+
+      // pozycja kropki (zaciśnięta do okręgu)
+      const rawX = CENTER + vx * SCALE;
+      const rawY = CENTER + vy * SCALE;
+      const d    = Math.hypot(rawX - CENTER, rawY - CENTER);
+      const rim  = CENTER - 8;
+      const px   = d > rim ? CENTER + (rawX - CENTER) / d * rim : rawX;
+      const py   = d > rim ? CENTER + (rawY - CENTER) / d * rim : rawY;
+      dotEl.style.left = (px - 7) + 'px';
+      dotEl.style.top  = (py - 7) + 'px';
+
+      // kolor kropki
+      if (currentStep === 1) {
+        dotEl.style.background = '#3b82f6';
+        tvalEl.textContent = `ax ${vx >= 0 ? '+' : ''}${vx.toFixed(3)}  ay ${vy >= 0 ? '+' : ''}${vy.toFixed(3)}`;
+        tringEl.style.cssText = 'position:absolute;pointer-events:none;border:none';
+      } else {
+        const good = len >= GOOD_G;
+        dotEl.style.background = good ? '#22c55e' : len >= 0.05 ? '#f59e0b' : '#ef4444';
+        // okrąg docelowy
+        const rd = GOOD_G * SCALE;
+        tringEl.style.cssText = [
+          'position:absolute;border-radius:50%;pointer-events:none',
+          `width:${rd * 2}px;height:${rd * 2}px`,
+          `left:${CENTER - rd}px;top:${CENTER - rd}px`,
+          `border:1.5px dashed ${good ? 'rgba(34,197,94,.4)' : 'rgba(239,68,68,.55)'}`,
+        ].join(';');
+        const pct = Math.min(100, (len / GOOD_G) * 100);
+        tvalEl.textContent = `siła: ${pct.toFixed(0)}%`;
+      }
     }
 
     function tick() {
+      updateTiltViz();
+      // btnReady: jeden pusty frame zanim zaczniemy słuchać przycisku
+      // gwarantuje że flush na początku zdążył się przetworzyć
+      if (!btnReady) { btnReady = true; triki.consumeClick(); rafId = requestAnimationFrame(tick); return; }
+
       if (triki.consumeClick()) {
         if (currentStep === 1) {
           triki.calibrateNeutral();
@@ -326,12 +393,12 @@ function startCalib() {
         } else {
           const ok = triki.calibrateRight();
           if (!ok) {
-            warnEl.textContent = '⚠️ Za mały przechył — spróbuj mocniej';
+            warnEl.textContent = '⚠️ Za mały przechył — poczekaj aż kropka wyjdzie za okrąg';
             navigator.vibrate?.([40, 80, 40]);
           } else {
             showDone();
             setTimeout(() => finish(true), 800);
-            return;   // stop RAF
+            return;
           }
         }
       }
