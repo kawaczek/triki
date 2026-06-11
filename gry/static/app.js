@@ -257,18 +257,8 @@ function startCalib() {
       <div id="_c_step" style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:2.5px;text-transform:uppercase">KALIBRACJA</div>
       <div id="_c_msg"  style="font-size:19px;font-weight:800;color:#fff;max-width:280px;line-height:1.25"></div>
       <div id="_c_sub"  style="font-size:12px;color:rgba(255,255,255,.42);max-width:260px;line-height:1.5"></div>
-
-      <!-- WIZUALIZATOR PRZECHYŁU -->
-      <div style="position:relative;width:130px;height:130px;flex-shrink:0;margin:4px 0">
-        <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.12)">
-          <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,255,255,.07)"></div>
-          <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.07)"></div>
-        </div>
-        <div id="_c_tring" style="position:absolute;border-radius:50%;pointer-events:none"></div>
-        <div id="_c_dot"   style="position:absolute;width:14px;height:14px;border-radius:50%;pointer-events:none;box-shadow:0 0 8px currentColor;transition:background .12s"></div>
-      </div>
-      <div id="_c_tval" style="font-size:10px;color:rgba(255,255,255,.28);font-family:monospace;min-height:15px;letter-spacing:.4px"></div>
-
+      <canvas id="_c_cv" width="140" height="140" style="flex-shrink:0;margin:2px 0"></canvas>
+      <div id="_c_tval" style="font-size:11px;color:rgba(255,255,255,.4);font-family:monospace;min-height:16px;letter-spacing:.5px"></div>
       <div style="width:220px;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden">
         <div id="_c_prog" style="height:100%;width:0%;background:#22c55e;transition:width .35s ease"></div>
       </div>
@@ -288,17 +278,20 @@ function startCalib() {
     const subEl   = ov.querySelector('#_c_sub');
     const progEl  = ov.querySelector('#_c_prog');
     const warnEl  = ov.querySelector('#_c_warn');
-    const dotEl   = ov.querySelector('#_c_dot');
-    const tringEl = ov.querySelector('#_c_tring');
     const tvalEl  = ov.querySelector('#_c_tval');
+    const cv      = ov.querySelector('#_c_cv');
+    const cc      = cv.getContext('2d');
 
-    const CENTER = 65;   // px, połowa 130px okręgu
-    const SCALE  = 95;   // px per 1g
-    const GOOD_G = 0.15; // zalecany przechył (okrąg docelowy)
+    const SZ     = 140;   // canvas px
+    const CX     = SZ / 2;
+    const CY     = SZ / 2;
+    const RADIUS = 60;    // okrąg główny
+    const SCALE  = 110;   // px per 1g
+    const GOOD_G = 0.15;  // zalecany przechył
 
     let rafId;
     let currentStep = 1;
-    let btnReady = false;  // true dopiero po jednej klatce bez kliknięcia — dodatkowe zabezpieczenie
+    let btnReady = false;
 
     function finish(success) {
       cancelAnimationFrame(rafId);
@@ -317,7 +310,6 @@ function startCalib() {
       subEl.textContent  = 'Ustaw kapsel w naturalnej pozycji trzymania, potem wciśnij przycisk';
       progEl.style.width = '0%';
       warnEl.textContent = '';
-      tringEl.style.cssText = 'position:absolute;pointer-events:none;border:none';
     }
 
     function showStep2() {
@@ -326,7 +318,7 @@ function startCalib() {
       iconEl.textContent = '➡️';
       stepEl.textContent = 'KROK 2 / 2  ·  KALIBRACJA';
       msgEl.textContent  = 'Przechyl mocno W PRAWO';
-      subEl.textContent  = 'Poczekaj aż kropka wyjdzie za okrąg, potem wciśnij przycisk';
+      subEl.textContent  = 'Wciśnij przycisk gdy kropka jest za okręgiem';
       progEl.style.width = '50%';
       warnEl.textContent = '';
     }
@@ -338,52 +330,79 @@ function startCalib() {
       subEl.textContent  = 'Zaczynamy grę…';
       progEl.style.width = '100%';
       warnEl.textContent = '';
-      tringEl.style.cssText = 'position:absolute;pointer-events:none;border:none';
     }
 
-    function updateTiltViz() {
-      // krok 1: wartości absolutne; krok 2: delta od neutral
+    function drawTiltViz() {
+      cc.clearRect(0, 0, SZ, SZ);
+
       const nx = triki._calibNeut?.ax ?? 0;
       const ny = triki._calibNeut?.ay ?? 0;
-      const vx = currentStep === 1 ? triki.ax       : triki.ax - nx;
-      const vy = currentStep === 1 ? triki.ay       : triki.ay - ny;
+      const vx = currentStep === 1 ? triki.ax : triki.ax - nx;
+      const vy = currentStep === 1 ? triki.ay : triki.ay - ny;
       const len = Math.hypot(vx, vy);
 
-      // pozycja kropki (zaciśnięta do okręgu)
-      const rawX = CENTER + vx * SCALE;
-      const rawY = CENTER + vy * SCALE;
-      const d    = Math.hypot(rawX - CENTER, rawY - CENTER);
-      const rim  = CENTER - 8;
-      const px   = d > rim ? CENTER + (rawX - CENTER) / d * rim : rawX;
-      const py   = d > rim ? CENTER + (rawY - CENTER) / d * rim : rawY;
-      dotEl.style.left = (px - 7) + 'px';
-      dotEl.style.top  = (py - 7) + 'px';
+      // tło okręgu
+      cc.beginPath();
+      cc.arc(CX, CY, RADIUS, 0, Math.PI * 2);
+      cc.strokeStyle = 'rgba(255,255,255,0.18)';
+      cc.lineWidth = 1.5;
+      cc.stroke();
+      cc.fillStyle = 'rgba(255,255,255,0.03)';
+      cc.fill();
 
-      // kolor kropki
-      if (currentStep === 1) {
-        dotEl.style.background = '#3b82f6';
-        tvalEl.textContent = `ax ${vx >= 0 ? '+' : ''}${vx.toFixed(3)}  ay ${vy >= 0 ? '+' : ''}${vy.toFixed(3)}`;
-        tringEl.style.cssText = 'position:absolute;pointer-events:none;border:none';
-      } else {
-        const good = len >= GOOD_G;
-        dotEl.style.background = good ? '#22c55e' : len >= 0.05 ? '#f59e0b' : '#ef4444';
-        // okrąg docelowy
+      // krzyż
+      cc.strokeStyle = 'rgba(255,255,255,0.12)';
+      cc.lineWidth = 1;
+      cc.beginPath(); cc.moveTo(CX - RADIUS, CY); cc.lineTo(CX + RADIUS, CY); cc.stroke();
+      cc.beginPath(); cc.moveTo(CX, CY - RADIUS); cc.lineTo(CX, CY + RADIUS); cc.stroke();
+
+      // okrąg docelowy (krok 2)
+      if (currentStep === 2) {
         const rd = GOOD_G * SCALE;
-        tringEl.style.cssText = [
-          'position:absolute;border-radius:50%;pointer-events:none',
-          `width:${rd * 2}px;height:${rd * 2}px`,
-          `left:${CENTER - rd}px;top:${CENTER - rd}px`,
-          `border:1.5px dashed ${good ? 'rgba(34,197,94,.4)' : 'rgba(239,68,68,.55)'}`,
-        ].join(';');
+        const good = len >= GOOD_G;
+        cc.beginPath();
+        cc.arc(CX, CY, rd, 0, Math.PI * 2);
+        cc.strokeStyle = good ? 'rgba(34,197,94,0.6)' : 'rgba(239,68,68,0.6)';
+        cc.lineWidth = 1.5;
+        cc.setLineDash([4, 4]);
+        cc.stroke();
+        cc.setLineDash([]);
+      }
+
+      // pozycja kropki (zaciśnięta do okręgu)
+      const rawX = CX + vx * SCALE;
+      const rawY = CY + vy * SCALE;
+      const d = Math.hypot(rawX - CX, rawY - CY);
+      const rim = RADIUS - 8;
+      const px = d > rim ? CX + (rawX - CX) / d * rim : rawX;
+      const py = d > rim ? CY + (rawY - CY) / d * rim : rawY;
+
+      // poświata
+      const dotColor = currentStep === 1 ? '#3b82f6'
+                     : len >= GOOD_G   ? '#22c55e'
+                     : len >= 0.05     ? '#f59e0b'
+                                       : '#ef4444';
+      const grd = cc.createRadialGradient(px, py, 0, px, py, 14);
+      grd.addColorStop(0, dotColor);
+      grd.addColorStop(1, dotColor + '00');
+      cc.beginPath(); cc.arc(px, py, 14, 0, Math.PI * 2);
+      cc.fillStyle = grd; cc.fill();
+
+      // kropka
+      cc.beginPath(); cc.arc(px, py, 7, 0, Math.PI * 2);
+      cc.fillStyle = dotColor; cc.fill();
+
+      // wartości
+      if (currentStep === 2) {
         const pct = Math.min(100, (len / GOOD_G) * 100);
-        tvalEl.textContent = `siła: ${pct.toFixed(0)}%`;
+        tvalEl.textContent = `siła: ${pct.toFixed(0)}%  (${len.toFixed(3)}g)`;
+      } else {
+        tvalEl.textContent = `ax ${vx >= 0 ? '+' : ''}${vx.toFixed(3)}  ay ${vy >= 0 ? '+' : ''}${vy.toFixed(3)}`;
       }
     }
 
     function tick() {
-      updateTiltViz();
-      // btnReady: jeden pusty frame zanim zaczniemy słuchać przycisku
-      // gwarantuje że flush na początku zdążył się przetworzyć
+      drawTiltViz();
       if (!btnReady) { btnReady = true; triki.consumeClick(); rafId = requestAnimationFrame(tick); return; }
 
       if (triki.consumeClick()) {
