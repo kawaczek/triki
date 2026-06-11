@@ -25,8 +25,9 @@ class TrikiController {
     this.gx = 0; this.gy = 0; this.gz = 0;
     this.ax = 0; this.ay = 0; this.az = 0;
     this.scheme      = 'tilt';
-    this.sensitivity = parseFloat(localStorage.getItem('triki_sensitivity') || '1.0');
-    this.invertX     = localStorage.getItem('triki_invert_x') === '1';
+    this.sensitivity = parseFloat(localStorage.getItem('triki_sensitivity') || '1.97');
+    const _ix = localStorage.getItem('triki_invert_x');
+    this.invertX     = _ix === null ? true : _ix === '1';
     this.invertY     = localStorage.getItem('triki_invert_y') === '1';
     this._btn        = false;
     this._btnEdge    = false;
