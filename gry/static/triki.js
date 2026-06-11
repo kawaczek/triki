@@ -38,7 +38,7 @@ class TrikiController {
     this._calibV2   = null;    // {cx,cy,rx,ry} — neutral + wektor "prawo"
     this._calibNeut = null;    // tymczasowe: neutral podczas kroku 1
     try { const s = localStorage.getItem('triki_calib_v2'); if (s) this._calibV2 = JSON.parse(s); } catch(_) {}
-    this._rotDrift  = 0;       // VeltoKit-style: auto-kalibrowany offset dryfu gz
+    this._rotDrift  = 0;       // offset gz ustawiany w chwili kalibracji (snapshot)
   }
 
   // ── auto-connect do zapamiętanego urządzenia ──────────────
@@ -160,11 +160,6 @@ class TrikiController {
     this.ax = dv.getInt16(8,  true) * ACCEL_S;
     this.ay = dv.getInt16(10, true) * ACCEL_S;
     this.az = dv.getInt16(12, true) * ACCEL_S;
-    // auto-drift: gdy kapsel spokojny, powoli przesuń offset w kierunku aktualnego gz
-    // (VeltoKit: paddleStillThreshold=3, autoCalibBlend=0.02, autoCalibRetain=0.98)
-    if (Math.abs(this.gz) < 3.0) {
-      this._rotDrift = this._rotDrift * 0.98 + this.gz * 0.02;
-    }
   }
 
   consumeClick() { const v = this._btnEdge; this._btnEdge = false; return v; }
@@ -173,6 +168,7 @@ class TrikiController {
   // Krok 1: wywołaj gdy kapsel w neutralnej pozycji tuż przed kliknięciem
   calibrateNeutral() {
     this._calibNeut = { ax: this.ax, ay: this.ay };
+    this._rotDrift  = this.gz;   // zero żyroskopu = co teraz pokazuje
   }
 
   // Krok 2: wywołaj gdy kapsel przechylony W PRAWO tuż przed kliknięciem
