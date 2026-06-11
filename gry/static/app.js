@@ -470,10 +470,16 @@ async function startFullDiag() {
       <div id="_d_prog" style="height:100%;width:0%;background:#22c55e;transition:width .08s linear;border-radius:2px"></div>
     </div>
     <div id="_d_warn" style="font-size:12px;color:#f59e0b;font-weight:600;min-height:16px;text-align:center"></div>
-    <!-- Live sensor bars -->
+    <!-- Live sensor bars + tilt canvas -->
     <div id="_d_live" style="width:100%;max-width:320px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 14px">
       <div style="color:rgba(255,255,255,.25);font-size:8px;letter-spacing:1.5px;margin-bottom:7px">LIVE SENSORY</div>
-      <div id="_d_bars"></div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center">
+          <canvas id="_d_cv" width="90" height="90"></canvas>
+          <div id="_d_tval" style="font-size:9px;color:rgba(255,255,255,.28);font-family:monospace;margin-top:3px;text-align:center;white-space:nowrap"></div>
+        </div>
+        <div id="_d_bars" style="flex:1;min-width:0"></div>
+      </div>
     </div>
     <!-- Results table (hidden until end) -->
     <div id="_d_res" style="display:none;width:100%;max-width:360px;overflow-x:auto;max-height:45vh;overflow-y:auto"></div>
@@ -496,6 +502,62 @@ async function startFullDiag() {
   const ctrEl   = ov.querySelector('#_d_ctr');
   const btnDone = ov.querySelector('#_d_done');
   const btnCancel = ov.querySelector('#_d_cancel');
+  const diagCv  = ov.querySelector('#_d_cv');
+  const diagCc  = diagCv.getContext('2d');
+  const diagTval= ov.querySelector('#_d_tval');
+
+  const D_SZ = 90, D_CX = 45, D_CY = 45, D_R = 38, D_SCALE = 72, D_GOOD = 0.15;
+  const TILT_STEPS = new Set(['neutral','right','left','fwd','back']);
+
+  function drawDiagTilt(stepId) {
+    diagCc.clearRect(0, 0, D_SZ, D_SZ);
+    const neut = stepResults.neutral?.mean;
+    const nx = neut?.ax ?? 0, ny = neut?.ay ?? 0;
+    // dla kroków przechyłu: delta od neutral; reszta: absolutne
+    const useDelta = TILT_STEPS.has(stepId) && neut;
+    const vx = useDelta ? triki.ax - nx : triki.ax;
+    const vy = useDelta ? triki.ay - ny : triki.ay;
+    const len = Math.hypot(vx, vy);
+
+    // tło
+    diagCc.beginPath(); diagCc.arc(D_CX, D_CY, D_R, 0, Math.PI*2);
+    diagCc.strokeStyle = 'rgba(255,255,255,0.15)'; diagCc.lineWidth = 1.5; diagCc.stroke();
+    diagCc.fillStyle = 'rgba(255,255,255,0.03)'; diagCc.fill();
+    // krzyż
+    diagCc.strokeStyle = 'rgba(255,255,255,0.1)'; diagCc.lineWidth = 1;
+    diagCc.beginPath(); diagCc.moveTo(D_CX-D_R, D_CY); diagCc.lineTo(D_CX+D_R, D_CY); diagCc.stroke();
+    diagCc.beginPath(); diagCc.moveTo(D_CX, D_CY-D_R); diagCc.lineTo(D_CX, D_CY+D_R); diagCc.stroke();
+    // okrąg docelowy (tylko kroki przechyłu)
+    if (TILT_STEPS.has(stepId) && stepId !== 'neutral') {
+      const rd = D_GOOD * D_SCALE;
+      const good = len >= D_GOOD;
+      diagCc.beginPath(); diagCc.arc(D_CX, D_CY, rd, 0, Math.PI*2);
+      diagCc.strokeStyle = good ? 'rgba(34,197,94,0.55)' : 'rgba(239,68,68,0.55)';
+      diagCc.lineWidth = 1.5; diagCc.setLineDash([3,3]); diagCc.stroke(); diagCc.setLineDash([]);
+    }
+    // pozycja kropki
+    const rawX = D_CX + vx * D_SCALE, rawY = D_CY + vy * D_SCALE;
+    const d = Math.hypot(rawX-D_CX, rawY-D_CY), rim = D_R - 6;
+    const px = d > rim ? D_CX + (rawX-D_CX)/d*rim : rawX;
+    const py = d > rim ? D_CY + (rawY-D_CY)/d*rim : rawY;
+    const col = stepId === 'neutral' ? '#3b82f6'
+              : !TILT_STEPS.has(stepId) ? '#a855f7'
+              : len >= D_GOOD ? '#22c55e' : len >= 0.05 ? '#f59e0b' : '#ef4444';
+    const grd = diagCc.createRadialGradient(px, py, 0, px, py, 10);
+    grd.addColorStop(0, col); grd.addColorStop(1, col+'00');
+    diagCc.beginPath(); diagCc.arc(px, py, 10, 0, Math.PI*2);
+    diagCc.fillStyle = grd; diagCc.fill();
+    diagCc.beginPath(); diagCc.arc(px, py, 5, 0, Math.PI*2);
+    diagCc.fillStyle = col; diagCc.fill();
+
+    // tekst pod canvasem
+    if (TILT_STEPS.has(stepId) && stepId !== 'neutral') {
+      const pct = Math.min(100, (len / D_GOOD) * 100);
+      diagTval.textContent = `${pct.toFixed(0)}%`;
+    } else {
+      diagTval.textContent = `${len.toFixed(3)}g`;
+    }
+  }
 
   // Build live sensor bars
   barsEl.innerHTML = AXES6.map(k => {
@@ -512,6 +574,7 @@ async function startFullDiag() {
 
   // Live RAF
   let liveRaf;
+  let _diagCurrentStep = 'neutral';
   (function live() {
     AXES6.forEach(k => {
       const val = triki[k];
@@ -522,6 +585,7 @@ async function startFullDiag() {
       if (bar) { bar.style.left = val>=0 ? '50%' : `${50-frac}%`; bar.style.width = frac+'%'; }
       if (valEl) valEl.textContent = (val>=0?'+':'')+val.toFixed(3);
     });
+    drawDiagTilt(_diagCurrentStep);
     liveRaf = requestAnimationFrame(live);
   })();
 
@@ -581,6 +645,7 @@ async function startFullDiag() {
   try {
     for (let i = 0; i < STEPS.length && !cancelled; i++) {
       const step = STEPS[i];
+      _diagCurrentStep = step.id;
       lblEl.textContent = `KROK ${i+1} / ${STEPS.length}  ·  ${step.label}`;
       icoEl.textContent = step.emoji;
       msgEl.textContent = step.msg;
