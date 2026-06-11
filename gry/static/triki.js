@@ -248,12 +248,8 @@ class TrikiController {
     return (Math.abs(v) < (dz ?? DEAD_ACCEL) ? 0 : v) * this.sensitivity * this._iy;
   }
 
+  // auto-drift correction wbudowany na stałe (VeltoKit-style)
   ROT(dz) {
-    return (Math.abs(this.gz) < (dz ?? DEAD_GYRO) ? 0 : this.gz) * this.sensitivity * this._ix;
-  }
-
-  // VeltoKit-style: gz minus auto-kalibrowany drift (zero-kalibracja automatyczna gdy spokojnie)
-  ROTD(dz) {
     const v = (this.gz - this._rotDrift) * this.sensitivity * this._ix;
     return Math.abs(v) < (dz ?? DEAD_GYRO) ? 0 : v;
   }

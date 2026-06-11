@@ -28,11 +28,6 @@
       "id": "swing",
       "label": "👋 Machaj na boki",
       "scheme": "swing"
-    },
-    {
-      "id": "gyrodrift",
-      "label": "🌀 Auto-drift (VeltoKit)",
-      "scheme": "gyrodrift"
     }
   ],
   "tag": "skill"
