@@ -247,15 +247,17 @@ export default class Arkanoid {
     }
 
     // 1. Ruch paletki — tryb wybierany na ekranie startowym (ctrlmode_pong):
-    //    'rotate' = obracanie kapslem, 'tilt' = przechył, 'swing' = machanie na boki
+    //    'rotate' = gz raw, 'tilt' = przechył ax, 'swing' = machanie, 'gyrodrift' = gz auto-drift (VeltoKit)
     const sensRot   = 0.00018 / 16;
     const sensTilt  = 0.00006;
     const sensSwing = 0.00003;
+    const sensDrift = 0.00018 / 16;  // taka sama czułość jak rotate, ale drift skompensowany
     if (this.triki.connected) {
       const mode = (typeof localStorage !== 'undefined' && localStorage.getItem('ctrlmode_pong')) || 'rotate';
-      if      (mode === 'tilt')  this.padX -= this.triki.GZ() * sensTilt * dt;
-      else if (mode === 'swing') this.padX -= this.triki.GZ() * sensSwing * dt;
-      else                       this.padX -= this.triki.ROT() * sensRot * dt;
+      if      (mode === 'tilt')      this.padX -= this.triki.GZ() * sensTilt * dt;
+      else if (mode === 'swing')     this.padX -= this.triki.GZ() * sensSwing * dt;
+      else if (mode === 'gyrodrift') this.padX -= this.triki.ROTD() * sensDrift * dt;
+      else                           this.padX -= this.triki.ROT() * sensRot * dt;
     } else if (this._keys.ArrowLeft || this._keys.ArrowRight) {
       this.padX += (this._keys.ArrowRight ? 1 : -1) * 0.7 * s;
     } else {
