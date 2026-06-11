@@ -1,0 +1,17 @@
+{
+  "title": "Lotki",
+  "emoji": "🎯",
+  "description": "Celuj przechylając kapslem, rzuć szybkim ruchem żeby trafić! 5 rzutów.",
+  "difficulty": "Średnia",
+  "color": "red",
+  "controls": {
+    "ble": "Przechylaj kapsel żeby celować, rzuć kapslem jak lotką żeby strzelić",
+    "mouse": "Przesuń kursor nad tarczę, kliknij żeby rzucić",
+    "keys": "Strzałki = celuj, Spacja = rzuć"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "scheme": "tilt",
+  "order": 9,
+  "tag": "skill"
+}
