@@ -4,13 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Workspace Overview
 
-Three separate sub-projects sharing a common subject: the **Triki od Żabki** BLE game controller (a capsule-shaped accelerometer/gyroscope device from the Polish Żabka convenience chain).
+Two sub-projects sharing a common subject: the **Triki od Żabki** BLE game controller (a capsule-shaped accelerometer/gyroscope device from the Polish Żabka convenience chain).
 
 | Subproject | Tech | Purpose |
 |---|---|---|
 | `triki_app/` | Flutter + Kotlin | Android app: turns Triki into a system mouse |
 | `gry/` | Python (stdlib) + Vanilla JS | Web-based mini-game hub controlled by Triki BLE |
-| `TrikiReader/` | C# / WPF / .NET 9 | Windows diagnostic tool: BLE read + 3D IMU visualization |
 
 ## Shared BLE Protocol (all three projects)
 
@@ -45,13 +44,20 @@ cd ~/projekty/zabka && rsync -avz --exclude='data/' --exclude='__pycache__/' --e
 
 ### Architecture
 
-- `gryzabka.py` — pure stdlib HTTP server; serves static files + REST API (`/api/games`, `/api/scores/<id>`, `/api/players`, `/api/triki-devices`, `/api/log`)
+- `gryzabka.py` — pure stdlib HTTP server; serves static files + REST API (`/api/games`, `/api/scores/<id>`, `/api/players`, `/api/triki-devices`, `/api/log`, `/api/diag`)
 - `index.html` — single-page hub: BLE connection, player profile, settings modal (⚙️), game selection, leaderboards
-- `static/triki.js` — `TrikiController`: BLE, axis schemes (`tilt`/`swing`/`rotate`), calibration, sensitivity + axis-invert settings (localStorage)
+- `static/triki.js` — `TrikiController`: BLE, axis schemes (`tilt`/`swing`/`rotate`), v2 calibration (2D rotation vector — handles arbitrary capsule rotation), sensitivity + axis-invert settings (localStorage)
 - `static/gameutils.js` — shared ES module for games (clamp, rand, pick, lerp, drawGrid, radialGlow, drawHintBubble)
 - `games/<id>/` — one directory per game (`meta.json` + `game.js` ES module); `_`-prefixed dirs ignored
 
-7 games: catch, snake, frog, maze, pong (Arkanoid), shooter, crawler (Dungeon — floor 1 is a tutorial with hint bubbles).
+**8 games:** catch, snake, frog, maze, pong (Arkanoid), shooter, crawler (Dungeon — floor 1 tutorial with hint bubbles), **kulka** (marble labyrinth — pure accelerometer tilt, 60s timer, collect 3 stars).
+
+**Sensor axis map** (confirmed by `/api/diag` wizard):
+- `ax` → tilt right/left (+right, −left)
+- `ay` → tilt forward/back (−forward, +back)
+- `gz` → rotation CW/CCW (−CW, +CCW)
+
+**v2 Calibration** (`TrikiController`): 2-step button-triggered — records neutral position then right-tilt direction as a 2D unit vector `{cx, cy, rx, ry}` in (ax, ay) space. Handles capsule rotated at any angle around its long axis. Saved in `localStorage('triki_calib_v2')`. `/api/diag` runs a 12-step sensor wizard and saves full JSON to `data/logs/diag_*.json`.
 
 ### Adding a New Game
 
@@ -95,22 +101,3 @@ flutter logs                   # device log stream
 
 **Deploy script** (`deploy_workflow.sh`) auto-increments the patch version in `pubspec.yaml`, builds release APK, commits and tags, then creates releases on both Gitea (`git.kawak.pl/kawak/Triki`) and GitHub (`kawaczek/triki`).
 
----
-
-## `TrikiReader/` — Windows WPF Diagnostic Tool
-
-**Build and run (Windows only, .NET 9):**
-```powershell
-dotnet build
-dotnet run --project TrikiReader.csproj
-dotnet test
-```
-
-### Architecture
-
-- `TrikiCore.cs` — `TrikiBleReader`: BLE scanning (looks for device name containing `Triki`), NUS connection, 14-byte frame parser, fires `SampleReceived` events
-- `MadgwickAHRS.cs` — sensor fusion filter combining gyro + accel into quaternion orientation
-- `ComplementaryTiltOrientationMapper.cs` / `VisualOrientationMapper.cs` — map quaternion to 3D render transforms
-- `MainWindow.xaml.cs` — WPF UI: real-time 3D capsule visualization + 3-axis gyroscope graph
-- `UiUpdateGate.cs` — rate-limits UI redraws
-- `TrikiReader.Tests/` — unit tests for frame parser, IMU unit conversion, orientation filter convergence
