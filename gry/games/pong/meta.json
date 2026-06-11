@@ -1,0 +1,34 @@
+{
+  "title": "Triki Arkanoid",
+  "emoji": "🧱",
+  "description": "Rozbijaj klocki, łap ulepszenia i przechodź poziomy! Klik = strzał/wystrzelenie.",
+  "difficulty": "Średnia",
+  "color": "blue",
+  "controls": {
+    "ble": "Obracaj kapslem LUB przechylaj na boki (wybór przed grą), kliknij żeby strzelać",
+    "mouse": "Przesuwaj w lewo/prawo, kliknij żeby strzelać",
+    "keys": "Strzałki lewo/prawo, Spacja = strzał"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "scheme": "rotate",
+  "order": 5,
+  "ctrlModes": [
+    {
+      "id": "rotate",
+      "label": "🔄 Obracaj kapslem",
+      "scheme": "rotate"
+    },
+    {
+      "id": "tilt",
+      "label": "↔️ Przechylaj",
+      "scheme": "tilt"
+    },
+    {
+      "id": "swing",
+      "label": "👋 Machaj na boki",
+      "scheme": "swing"
+    }
+  ],
+  "tag": "skill"
+}

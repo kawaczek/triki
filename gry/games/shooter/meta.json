@@ -1,0 +1,17 @@
+{
+  "title": "Kosmo Żaba",
+  "emoji": "🚀",
+  "description": "Żabka w spodku broni galaktyki! Zestrzeluj najeźdźców, zanim dotrą na dół.",
+  "difficulty": "Średnia",
+  "color": "blue",
+  "controls": {
+    "ble": "Przechylaj kapsel — ruch statku, guzik = strzał",
+    "mouse": "Statek leci za kursorem, klik = strzał",
+    "keys": "Strzałki / AD = ruch, Spacja = strzał"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "scheme": "tilt",
+  "order": 6,
+  "tag": "arcade"
+}

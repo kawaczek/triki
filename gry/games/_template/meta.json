@@ -1,0 +1,15 @@
+{
+  "title": "Nowa gra",
+  "emoji": "🎮",
+  "description": "Opis gry — zmień w meta.json",
+  "difficulty": "Łatwa",
+  "color": "yellow",
+  "controls": {
+    "ble": "Opis sterowania BLE",
+    "mouse": "Opis sterowania myszą",
+    "keys": null
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 99
+}

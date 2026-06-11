@@ -1,0 +1,17 @@
+{
+  "title": "Labirynt Kulka",
+  "emoji": "🌀",
+  "description": "Tocz kulkę przez labirynt do mety. Omijaj dziury! 5 plansz o rosnącej trudności.",
+  "difficulty": "Średnia",
+  "color": "yellow",
+  "controls": {
+    "ble": "Przechylaj kapsel — kulka toczy się jak po stole",
+    "mouse": "Kulka toczy się w stronę kursora / palca",
+    "keys": "Strzałki / WSAD"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "scheme": "tilt",
+  "order": 4,
+  "tag": "puzzle"
+}

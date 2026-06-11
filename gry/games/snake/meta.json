@@ -1,0 +1,34 @@
+{
+  "title": "Wąż Triki",
+  "emoji": "🐍",
+  "description": "Klasyczny wąż! Zbieraj jabłka, rośnij i uważaj na kamienie od 3. poziomu.",
+  "difficulty": "Łatwa",
+  "color": "green",
+  "controls": {
+    "ble": "Tilt/machnięcie w prawo = skręt w prawo od głowy, w lewo = skręt w lewo",
+    "mouse": "Wąż skręca w stronę kursora / palca",
+    "keys": "Strzałki / WSAD"
+  },
+  "hasScore": true,
+  "scoreUnit": "jabłek",
+  "scheme": "tilt",
+  "order": 2,
+  "ctrlModes": [
+    {
+      "id": "tilt",
+      "label": "↕️ Przechył (względny)",
+      "scheme": "tilt"
+    },
+    {
+      "id": "swing",
+      "label": "👋 Machnięcie (względny)",
+      "scheme": "swing"
+    },
+    {
+      "id": "rotate",
+      "label": "🔄 Obrót = skręt",
+      "scheme": "rotate"
+    }
+  ],
+  "tag": "skill"
+}

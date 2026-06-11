@@ -1,0 +1,24 @@
+{
+  "title": "Kula",
+  "emoji": "🔮",
+  "description": "Toczysz kulkę samym przechyłem kapsla — jak prawdziwy labirynt! Zbieraj gwiazdy przed upływem czasu.",
+  "difficulty": "Średnia",
+  "color": "purple",
+  "controls": {
+    "ble": "Przechylaj kapsel — kulka toczy się zgodnie z grawitacją. Przycisk = hamulec awaryjny",
+    "mouse": "Przesuń kursor — kulka ciągnie w tę stronę",
+    "keys": null
+  },
+  "hasScore": true,
+  "scoreUnit": "gwiazd",
+  "scheme": "tilt",
+  "order": 8,
+  "ctrlModes": [
+    {
+      "id": "tilt",
+      "label": "↕️ Przechył (labirynt)",
+      "scheme": "tilt"
+    }
+  ],
+  "tag": "skill"
+}
