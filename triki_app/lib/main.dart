@@ -1197,7 +1197,7 @@ class _DashboardPageState extends State<DashboardPage>
             Padding(
               padding: const EdgeInsets.only(left: 16),
               child: _ToggleRow(
-                icon: Icons.double_tap,
+                icon: Icons.mouse,
                 label: 'Obsługa podwójnego kliknięcia (lag 400ms)',
                 value: _enableDoubleClick,
                 onChanged: (v) { setState(() => _enableDoubleClick = v); _saveSetting('enable_double_click', v); },
