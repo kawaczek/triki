@@ -376,12 +376,15 @@ function frame(t) {
   const hit = btn || pressQueued; pressQueued = false;
 
   if (mode === 'wheel') {
-    // gz z kompensacją dryfu (rotVal) w stopniach na sekundę
-    cumulativeAngle += rotVal * dt;
+    const ix = triki._ix; // -1 lub 1
+    const correctedGz = (triki.gz - triki._rotDrift) * ix;
+    // Martwa strefa 2.5 deg/s na drżenie dłoni
+    const gzFiltered = Math.abs(correctedGz) < 2.5 ? 0 : correctedGz;
+    cumulativeAngle += gzFiltered * dt;
     
-    // 10 stopni fizycznego obrotu = 1 krok wyboru znaku
+    // 15 stopni fizycznego obrotu = 1 krok wyboru znaku (3x stabilniej!)
     const stepRad = (2 * Math.PI) / WK.length;
-    wAngle = - (cumulativeAngle / 10) * stepRad;
+    wAngle = - (cumulativeAngle / 15) * stepRad;
 
     if (hit) { typeKey(WK[wIdx()]); wFlash = 0.22; }
     if (wFlash > 0) wFlash -= dt;
