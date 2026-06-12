@@ -105,7 +105,12 @@
 
 <header>
   <span class="title">⌨️ Triki Klawiatura</span>
-  <button id="btn-ble">🔌 Połącz BLE</button>
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; color: rgba(255,255,255,0.7);">
+      <input type="checkbox" id="chk-invert-rot" style="cursor: pointer; accent-color: #22c55e;"> 🔄 Odwróć (Rewers)
+    </label>
+    <button id="btn-ble">🔌 Połącz BLE</button>
+  </div>
 </header>
 
 <div id="text-display">
@@ -147,6 +152,10 @@ const triki = new TrikiController();
 triki.scheme = 'rotate'; // Domyślny schemat dla trybu "Koło"
 let wasConn = false;
 document.getElementById('btn-ble').onclick = () => triki.connect();
+
+const chkInvert = document.getElementById('chk-invert-rot');
+chkInvert.checked = triki.invertX;
+chkInvert.onchange = (e) => triki.setInvert('x', e.target.checked);
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('kb-canvas');
@@ -353,6 +362,7 @@ function frame(t) {
     btn.className   = wasConn ? 'ok' : '';
     if (wasConn) {
       triki.calibrateNeutral(); // Wyzeruj dryf na starcie
+      chkInvert.checked = triki.invertX; // zsynchronizuj stan checkboxa
     }
     cumulativeAngle = 0;
     wAngle = 0;

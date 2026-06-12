@@ -363,6 +363,14 @@ header('Expires: 0');
       <button id="btn-reset" class="btn-secondary">🔄 Zresetuj kąt (do zera)</button>
       <button id="btn-drift-cal" class="btn-secondary">🎯 Kalibruj dryf (neutral)</button>
     </div>
+
+    <!-- Invert Checkbox -->
+    <div style="margin-top: 15px; display: flex; justify-content: center;">
+      <label style="font-size: 14px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; cursor: pointer;">
+        <input type="checkbox" id="chk-invert-x" style="width: 16px; height: 16px; accent-color: var(--green);">
+        🔄 Odwróć obrót (Rewers kapsla)
+      </label>
+    </div>
   </div>
 
   <!-- Live Values Card -->
@@ -491,6 +499,12 @@ header('Expires: 0');
     alert("Raport skopiowany do schowka! Wklej go w oknie chatu z Antigravity 🐾");
   };
 
+  // Obsługa odwrócenia osi
+  const chkInvertX = document.getElementById('chk-invert-x');
+  chkInvertX.onchange = (e) => {
+    triki.setInvert('x', e.target.checked);
+  };
+
   // Główna pętla diagnostyczna
   function update(timestamp) {
     requestAnimationFrame(update);
@@ -508,6 +522,7 @@ header('Expires: 0');
         // Auto-drift na start
         triki.calibrateNeutral();
         document.getElementById('drift-offset').textContent = triki._rotDrift.toFixed(2);
+        chkInvertX.checked = triki.invertX; // zsynchronizuj stan
         resetAngle();
       }
 
