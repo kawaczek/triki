@@ -1,0 +1,17 @@
+{
+  "id": "zulki",
+  "title": "Żulki",
+  "emoji": "🍺",
+  "description": "Zostań milionerem w żulowym stylu! 4 odpowiedzi, koło losowe, łapówki.",
+  "difficulty": "Trudna",
+  "color": "amber",
+  "controls": {
+    "ble": "Przechyl = zaznacz odpowiedź · Kliknij = zatwierdź · Potrząśnij = zakręć kołem",
+    "mouse": "Kliknij odpowiedź · Lifeline'y na dole",
+    "keys": "← → = zaznacz · Enter = zatwierdź · 1/2/3 = lifeline"
+  },
+  "hasScore": true,
+  "scoreUnit": "zł",
+  "tag": "party",
+  "order": 11
+}
