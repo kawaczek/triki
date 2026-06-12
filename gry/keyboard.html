@@ -151,6 +151,7 @@ let pressQueued = false;
 let cumulativeAngle = 0; // Zintegrowany kąt obrotu w stopniach
 let axisActiveX = false; // Zatrzask joysticka dla osi pionowej
 let axisActiveY = false; // Zatrzask joysticka dla osi poziomej
+let lastClickTime = 0;   // Timestamp ostatniego kliknięcia (debounce)
 
 // ── Triki ─────────────────────────────────────────────────────────────────────
 const triki = new TrikiController();
@@ -418,7 +419,16 @@ function frame(t) {
   const gz  = triki.GZ?.() ?? 0;
   const gx  = triki.GX?.() ?? 0;
   const btn = triki.consumeClick?.() ?? false;
-  const hit = btn || pressQueued; pressQueued = false;
+  let hit = btn || pressQueued; pressQueued = false;
+
+  if (hit) {
+    const now = performance.now();
+    if (now - lastClickTime < 250) {
+      hit = false; // zignoruj szum BLE (debounce)
+    } else {
+      lastClickTime = now;
+    }
+  }
 
   if (mode === 'wheel') {
     const ix = triki._ix; // -1 lub 1
