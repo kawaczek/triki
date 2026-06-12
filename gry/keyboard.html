@@ -110,7 +110,7 @@
       <input type="checkbox" id="chk-invert-rot" style="cursor: pointer; accent-color: #22c55e;"> 🔄 Odwróć
     </label>
     <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.7);">
-      ⚙️ Skok: <input type="range" id="rng-step" min="5" max="45" step="1" style="width: 60px; cursor: pointer; accent-color: #22c55e;"> <span id="lbl-step">15°</span>
+      ⚙️ Skok: <input type="range" id="rng-step" min="1" max="45" step="1" style="width: 60px; cursor: pointer; accent-color: #22c55e;"> <span id="lbl-step">15°</span>
     </label>
     <button id="btn-ble">🔌 Połącz BLE</button>
   </div>
@@ -172,6 +172,28 @@ rngStep.oninput = (e) => {
   lblStep.textContent = stepDegrees + '°';
   localStorage.setItem('triki_kb_wheel_step', stepDegrees);
 };
+
+// ── Blokowanie wygaszania ekranu (Wake Lock) ──
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    console.log('Wake lock aktywowany! 🐸');
+  } catch (err) {
+    console.warn('Błąd Wake Lock:', err.message);
+  }
+}
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release().then(() => { wakeLock = null; console.log('Wake lock zwolniony 🐾'); });
+  }
+}
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && triki.connected) {
+    await requestWakeLock();
+  }
+});
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('kb-canvas');
@@ -381,6 +403,9 @@ function frame(t) {
     if (wasConn) {
       triki.calibrateNeutral(); // Wyzeruj dryf na starcie
       chkInvert.checked = triki.invertX; // zsynchronizuj stan checkboxa
+      requestWakeLock(); // Nie wygaszaj ekranu
+    } else {
+      releaseWakeLock(); // Pozwól wygasić ekran po rozłączeniu
     }
     cumulativeAngle = 0;
     wAngle = 0;

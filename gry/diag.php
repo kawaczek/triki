@@ -444,6 +444,28 @@ header('Expires: 0');
   let wasConnected = false;
   let lastTime = 0;
 
+  // ── Blokowanie wygaszania ekranu (Wake Lock) ──
+  let wakeLock = null;
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock active');
+    } catch (err) {
+      console.warn('Wake Lock error:', err.message);
+    }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) {
+      wakeLock.release().then(() => { wakeLock = null; });
+    }
+  }
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && triki.connected) {
+      await requestWakeLock();
+    }
+  });
+
   // Aktywacja BLE
   document.getElementById('status-btn').onclick = () => {
     triki.connect().catch(err => {
@@ -523,6 +545,7 @@ header('Expires: 0');
         triki.calibrateNeutral();
         document.getElementById('drift-offset').textContent = triki._rotDrift.toFixed(2);
         chkInvertX.checked = triki.invertX; // zsynchronizuj stan
+        requestWakeLock(); // Aktywuj blokadę wygaszania
         resetAngle();
       }
 
@@ -596,6 +619,7 @@ header('Expires: 0');
         const btn = document.getElementById('status-btn');
         btn.textContent = "🔌 Szukaj Kapsla BLE";
         btn.className = "btn disconnected";
+        releaseWakeLock(); // Zwolnij blokadę wygaszania
       }
     }
   }
