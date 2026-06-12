@@ -436,7 +436,7 @@ header('Expires: 0');
   </div>
 </div>
 
-<script src="/static/triki.js"></script>
+<script src="/static/triki.js?v=202606121710"></script>
 <script>
   const triki = new TrikiController();
   let currentMode = 'wheel';
@@ -546,9 +546,9 @@ header('Expires: 0');
       document.getElementById('calib-v2').textContent = triki._calibV2 ? "Tak" : "Brak";
 
       // Integracja kąta dla Z-Gyro (Drift compensated)
-      // rotVal jest już przemnożony przez czułość i inwersję.
-      // Do czystego kąta fizycznego używamy rzeczywistej prędkości z kompensacją dryfu:
-      const correctedGz = triki.gz - triki._rotDrift;
+      // Do czystego kąta fizycznego używamy rzeczywistej prędkości z kompensacją dryfu i kierunkiem rewersu:
+      const ix = triki._ix; // -1 lub 1
+      const correctedGz = (triki.gz - triki._rotDrift) * ix;
       if (Math.abs(correctedGz) > 1.5) {
         cumulativeAngle += correctedGz * dt;
       }
