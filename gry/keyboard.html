@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0c10">
+  <title>⌨️ Triki Klawiatura</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0c10;
+      color: #f1f5f9;
+      font-family: 'Outfit', sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: #13161e;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      flex-shrink: 0;
+    }
+    .title { font-weight: 700; font-size: 15px; }
+    #btn-ble {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #f1f5f9;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    #btn-ble.ok { border-color: #22c55e; color: #22c55e; background: rgba(34,197,94,0.1); }
+
+    /* ── Text display ── */
+    #text-display {
+      background: #13161e;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 10px 16px;
+      min-height: 52px;
+      flex-shrink: 0;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+    }
+    #typed { word-break: break-all; }
+    #typed.empty { color: rgba(255,255,255,0.2); font-weight: 400; font-size: 15px; }
+    .cursor { animation: blink 1s steps(1) infinite; color: #22c55e; margin-left: 1px; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Tabs ── */
+    #tabs {
+      display: flex;
+      flex-shrink: 0;
+      background: #13161e;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .tab {
+      flex: 1;
+      padding: 9px 8px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: rgba(255,255,255,0.4);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab.on { color: #22c55e; border-bottom-color: #22c55e; background: rgba(34,197,94,0.06); }
+
+    /* ── Canvas ── */
+    #kb-canvas { flex: 1; width: 100%; display: block; touch-action: none; }
+
+    /* ── Hint ── */
+    #hint {
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      padding: 5px 8px;
+      flex-shrink: 0;
+      background: #13161e;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="title">⌨️ Triki Klawiatura</span>
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+    <span id="lbl-orientation" style="font-size: 11px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 4px;">
+      Ułożenie: <span id="txt-orientation" style="font-weight:bold;color:#f1f5f9">🤖 Normalne</span>
+    </span>
+    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: rgba(255,255,255,0.7);">
+      <input type="checkbox" id="chk-invert-rot" style="cursor: pointer; accent-color: #22c55e;"> 🔄 Odwróć
+    </label>
+    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.7);">
+      ⚙️ Skok: <input type="range" id="rng-step" min="1" max="45" step="1" style="width: 60px; cursor: pointer; accent-color: #22c55e;"> <span id="lbl-step">15°</span>
+    </label>
+    <button id="btn-ble">🔌 Połącz BLE</button>
+  </div>
+</header>
+
+<div id="text-display">
+  <span id="typed" class="empty">Wpisz coś…</span><span class="cursor">|</span>
+</div>
+
+<div id="tabs">
+  <button class="tab on" data-m="wheel">🔄 Koło</button>
+  <button class="tab"    data-m="grid">⌨️ Siatka</button>
+</div>
+
+<canvas id="kb-canvas"></canvas>
+
+<div id="hint">…</div>
+
+<script src="/static/triki.js?v=202606121806"></script>
+<script>
+// ── Keys ─────────────────────────────────────────────────────────────────────
+const WK = ['A','B','C','D','E','F','G','H','I','J','K','L','M',
+            'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',' ','⌫'];
+
+const GK = [
+  ['A','B','C','D','E','F','G'],
+  ['H','I','J','K','L','M','N'],
+  ['O','P','Q','R','S','T','U'],
+  ['V','W','X','Y','Z',' ','⌫'],
+];
+const GR = GK.length, GC = GK[0].length;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let text = '', mode = 'wheel';
+let wAngle = 0, wFlash = 0;
+let gRow = 0, gCol = 0, gFlash = 0, navT = 0;
+let pressQueued = false;
+let cumulativeAngle = 0; // Zintegrowany kąt obrotu w stopniach
+let axisActiveX = false; // Zatrzask joysticka dla osi pionowej
+let axisActiveY = false; // Zatrzask joysticka dla osi poziomej
+let lastClickTime = 0;   // Timestamp ostatniego kliknięcia (debounce)
+
+// ── Triki ─────────────────────────────────────────────────────────────────────
+const triki = new TrikiController();
+triki.scheme = 'rotate'; // Domyślny schemat dla trybu "Koło"
+let wasConn = false;
+document.getElementById('btn-ble').onclick = () => triki.connect();
+
+const chkInvert = document.getElementById('chk-invert-rot');
+chkInvert.checked = triki.invertX;
+chkInvert.onchange = (e) => triki.setInvert('x', e.target.checked);
+
+const rngStep = document.getElementById('rng-step');
+const lblStep = document.getElementById('lbl-step');
+let stepDegrees = parseInt(localStorage.getItem('triki_kb_wheel_step') || '15');
+rngStep.value = stepDegrees;
+lblStep.textContent = stepDegrees + '°';
+rngStep.oninput = (e) => {
+  stepDegrees = parseInt(e.target.value);
+  lblStep.textContent = stepDegrees + '°';
+  localStorage.setItem('triki_kb_wheel_step', stepDegrees);
+};
+
+// ── Blokowanie wygaszania ekranu (Wake Lock) ──
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    console.log('Wake lock aktywowany! 🐸');
+  } catch (err) {
+    console.warn('Błąd Wake Lock:', err.message);
+  }
+}
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release().then(() => { wakeLock = null; console.log('Wake lock zwolniony 🐾'); });
+  }
+}
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && triki.connected) {
+    await requestWakeLock();
+  }
+});
+
+// ── Canvas ────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('kb-canvas');
+const ctx    = canvas.getContext('2d');
+let W = 0, H = 0;
+
+function resize() {
+  const dpr = devicePixelRatio || 1;
+  const r   = canvas.getBoundingClientRect();
+  W = r.width; H = r.height;
+  if (!W || !H) return;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+new ResizeObserver(resize).observe(canvas);
+resize();
+
+// ── Text ──────────────────────────────────────────────────────────────────────
+function typeKey(k) {
+  if (k === '⌫') text = text.slice(0, -1);
+  else            text += k;
+  const el = document.getElementById('typed');
+  if (text) { el.textContent = text; el.className = ''; }
+  else      { el.textContent = 'Wpisz coś…'; el.className = 'empty'; }
+}
+
+// ── Keyboard (physical) ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter')     { pressQueued = true; e.preventDefault(); }
+  if (e.key === 'Backspace') { typeKey('⌫'); e.preventDefault(); }
+  if (mode === 'grid') {
+    const mv = { ArrowRight:[0,1], ArrowLeft:[0,-1], ArrowDown:[1,0], ArrowUp:[-1,0] }[e.key];
+    if (mv) { gRow = Math.max(0,Math.min(GR-1,gRow+mv[0])); gCol = Math.max(0,Math.min(GC-1,gCol+mv[1])); navT = 0; e.preventDefault(); }
+  }
+});
+
+// ── Touch: wheel tap → type current; grid tap → navigate + type ───────────────
+canvas.addEventListener('click', e => {
+  if (mode === 'wheel') {
+    pressQueued = true;
+    return;
+  }
+  const r  = canvas.getBoundingClientRect();
+  const pad = 6;
+  const cw = (W - pad*2) / GC, ch = (H - pad*2) / GR;
+  const c  = Math.floor((e.clientX - r.left - pad) / cw);
+  const rr = Math.floor((e.clientY - r.top  - pad) / ch);
+  if (rr >= 0 && rr < GR && c >= 0 && c < GC) {
+    gRow = rr; gCol = c;
+    typeKey(GK[rr][c]);
+    gFlash = 0.22;
+  }
+});
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(b => {
+  b.onclick = () => {
+    mode = b.dataset.m;
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    triki.scheme = mode === 'wheel' ? 'rotate' : 'tilt';
+    cumulativeAngle = 0;
+    wAngle = 0;
+    axisActiveX = false;
+    axisActiveY = false;
+    updateHint();
+  };
+});
+
+// ── Hint ──────────────────────────────────────────────────────────────────────
+function updateHint() {
+  document.getElementById('hint').textContent = mode === 'wheel'
+    ? (triki.connected
+        ? 'obróć kapsel = nawiguj  ·  guzik = wpisz'
+        : 'obróć kapsel = nawiguj  ·  guzik / Enter = wpisz  ·  dotknij = wpisz')
+    : (triki.connected
+        ? 'przechyl lewo/prawo + przód/tył = nawiguj  ·  guzik = wpisz  ·  dotknij = wpisz'
+        : '← → ↑ ↓ = nawiguj  ·  Enter = wpisz  ·  dotknij literę');
+}
+
+// ── Wheel index ───────────────────────────────────────────────────────────────
+function wIdx() {
+  const step = (2 * Math.PI) / WK.length;
+  return ((Math.round(-wAngle / step) % WK.length) + WK.length) % WK.length;
+}
+
+// ── Draw: wheel ───────────────────────────────────────────────────────────────
+function drawWheel() {
+  if (!W || !H) return;
+  ctx.clearRect(0, 0, W, H);
+
+  const N    = WK.length;
+  const step = (2 * Math.PI) / N;
+  const cx   = W / 2;
+  const cy   = H / 2 + H * 0.06;
+  const R    = Math.min(W, H) * 0.36;
+  const sel  = wIdx();
+
+  // faint ring
+  ctx.beginPath(); ctx.arc(cx, cy, R + 24, 0, 2*Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  WK.forEach((k, i) => {
+    const a  = -Math.PI/2 + wAngle + i * step;
+    const lx = cx + Math.cos(a) * R;
+    const ly = cy + Math.sin(a) * R;
+    const isSel = i === sel;
+
+    // fade: brighter near top
+    const da   = Math.abs(((a + Math.PI/2 + 4*Math.PI) % (2*Math.PI)) - Math.PI);
+    const fade = Math.max(0, 1 - da / Math.PI);
+
+    ctx.save();
+    ctx.translate(lx, ly);
+
+    if (isSel) {
+      ctx.beginPath(); ctx.arc(0, 0, 22, 0, 2*Math.PI);
+      ctx.fillStyle   = wFlash > 0 ? 'rgba(34,197,94,0.6)' : 'rgba(34,197,94,0.18)';
+      ctx.fill();
+      if (wFlash <= 0) {
+        ctx.strokeStyle = 'rgba(34,197,94,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+    }
+
+    const fsz = isSel
+      ? Math.round(W * 0.062)
+      : Math.round(W * 0.033 + fade * W * 0.016);
+
+    ctx.font         = `${isSel ? 'bold ' : ''}${fsz}px Outfit, monospace`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle    = isSel ? '#22c55e' : `rgba(255,255,255,${0.12 + fade * 0.68})`;
+    ctx.fillText(k === ' ' ? '·' : k, 0, 0);
+    ctx.restore();
+  });
+
+  // ▼ pointer arrow
+  ctx.beginPath();
+  ctx.moveTo(cx,    cy - R - 36);
+  ctx.lineTo(cx-9,  cy - R - 50);
+  ctx.lineTo(cx+9,  cy - R - 50);
+  ctx.closePath();
+  ctx.fillStyle = '#22c55e'; ctx.fill();
+
+  // big label above arrow
+  const lbl = WK[sel];
+  ctx.font         = `bold ${Math.round(W * 0.048)}px Outfit, monospace`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = wFlash > 0 ? '#22c55e' : 'rgba(255,255,255,0.92)';
+  ctx.fillText(
+    lbl === ' ' ? '[ SPACJA ]' : lbl === '⌫' ? '[ ⌫ ]' : lbl,
+    cx, cy - R - 70
+  );
+}
+
+// ── Draw: grid ────────────────────────────────────────────────────────────────
+function drawGrid() {
+  if (!W || !H) return;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = 6;
+  const cw = (W - pad*2) / GC;
+  const ch = (H - pad*2) / GR;
+
+  GK.forEach((row, r) => {
+    row.forEach((k, c) => {
+      const x   = pad + c * cw, y = pad + r * ch;
+      const sel = r === gRow && c === gCol;
+      const fls = sel && gFlash > 0;
+      const spc = k === ' ' || k === '⌫';
+
+      ctx.beginPath();
+      ctx.roundRect(x+2, y+2, cw-4, ch-4, 8);
+      ctx.fillStyle = fls
+        ? 'rgba(34,197,94,0.42)'
+        : sel ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.04)';
+      ctx.fill();
+      if (sel) {
+        ctx.strokeStyle = fls ? '#22c55e' : 'rgba(34,197,94,0.65)';
+        ctx.lineWidth   = 1.5; ctx.stroke();
+      }
+
+      const fsz = Math.round(Math.min(cw, ch) * 0.40);
+      ctx.font         = `${sel ? 'bold ' : ''}${fsz}px Outfit, monospace`;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle    = sel ? '#22c55e' : spc ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.82)';
+      ctx.fillText(k === ' ' ? '·' : k, x + cw/2, y + ch/2);
+    });
+  });
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let lastT = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((t - lastT) / 1000, 0.05); lastT = t;
+
+  // connection UI
+  if (triki.connected !== wasConn) {
+    wasConn = triki.connected;
+    const btn = document.getElementById('btn-ble');
+    btn.textContent = wasConn ? '✅ ' + (triki.name ?? 'Kapsel') : '🔌 Połącz BLE';
+    btn.className   = wasConn ? 'ok' : '';
+    if (wasConn) {
+      triki.calibrateNeutral(); // Wyzeruj dryf na starcie
+      chkInvert.checked = triki.invertX; // zsynchronizuj stan checkboxa
+      requestWakeLock(); // Nie wygaszaj ekranu
+    } else {
+      releaseWakeLock(); // Pozwól wygasić ekran po rozłączeniu
+    }
+    cumulativeAngle = 0;
+    wAngle = 0;
+    axisActiveX = false;
+    axisActiveY = false;
+    updateHint();
+  }
+
+  // Dynamiczny status ułożenia kapsla
+  const txtOrient = document.getElementById('txt-orientation');
+  if (txtOrient) {
+    if (!triki.connected) {
+      txtOrient.textContent = "Brak połączenia";
+      txtOrient.style.color = "rgba(255,255,255,0.3)";
+    } else if (triki.isFlipped) {
+      txtOrient.textContent = "🙃 Odwrócony";
+      txtOrient.style.color = "#22c55e";
+    } else {
+      txtOrient.textContent = "🤖 Normalne";
+      txtOrient.style.color = "#f1f5f9";
+    }
+  }
+
+  const rotVal = triki.ROT?.() ?? 0;
+  const gz  = triki.GZ?.() ?? 0;
+  const gx  = triki.GX?.() ?? 0;
+  const btn = triki.consumeClick?.() ?? false;
+  let hit = btn || pressQueued; pressQueued = false;
+
+  if (hit) {
+    const now = performance.now();
+    if (now - lastClickTime < 250) {
+      hit = false; // zignoruj szum BLE (debounce)
+    } else {
+      lastClickTime = now;
+    }
+  }
+
+  if (mode === 'wheel') {
+    const ix = triki._ix; // -1 lub 1
+    const correctedGz = (triki.gz - triki._rotDrift) * ix;
+    // Martwa strefa 2.5 deg/s na drżenie dłoni
+    const gzFiltered = Math.abs(correctedGz) < 2.5 ? 0 : correctedGz;
+    cumulativeAngle += gzFiltered * dt;
+    
+    // Konfigurowalny fizyczny obrót (stepDegrees) = 1 krok wyboru znaku
+    const stepRad = (2 * Math.PI) / WK.length;
+    wAngle = - (cumulativeAngle / stepDegrees) * stepRad;
+
+    if (hit) { typeKey(WK[wIdx()]); wFlash = 0.22; }
+    if (wFlash > 0) wFlash -= dt;
+    drawWheel();
+  } else {
+    // Tryb Siatki (Dyskretny joystick krokowy z zatrzaskiem powrotu do zera)
+    const TH = 0.16;       // Próg wychylenia do wykonania kroku
+    const TH_RESET = 0.07; // Próg powrotu do pozycji neutralnej (uzbrojenie)
+
+    // Oś pozioma (GZ)
+    if (!axisActiveY) {
+      if (gz > TH) {
+        gCol = Math.min(GC - 1, gCol + 1);
+        axisActiveY = true;
+      } else if (gz < -TH) {
+        gCol = Math.max(0, gCol - 1);
+        axisActiveY = true;
+      }
+    } else {
+      if (Math.abs(gz) < TH_RESET) {
+        axisActiveY = false;
+      }
+    }
+
+    // Oś pionowa (GX)
+    if (!axisActiveX) {
+      if (gx > TH) {
+        gRow = Math.min(GR - 1, gRow + 1);
+        axisActiveX = true;
+      } else if (gx < -TH) {
+        gRow = Math.max(0, gRow - 1);
+        axisActiveX = true;
+      }
+    } else {
+      if (Math.abs(gx) < TH_RESET) {
+        axisActiveX = false;
+      }
+    }
+
+    if (hit) { typeKey(GK[gRow][gCol]); gFlash = 0.22; }
+    if (gFlash > 0) gFlash -= dt;
+    drawGrid();
+  }
+}
+requestAnimationFrame(frame);
+updateHint();
+</script>
+</body>
+</html>

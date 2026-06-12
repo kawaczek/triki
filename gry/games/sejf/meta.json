@@ -1,0 +1,15 @@
+{
+  "title": "Sejf Kasiarza",
+  "emoji": "🔓",
+  "description": "Złam szyfr kręcąc tarczą w lewo/prawo. Słuchaj kliknięć i wciskaj guzik gdy trafisz!",
+  "difficulty": "Średnia",
+  "color": "green",
+  "controls": {
+    "ble": "Obracaj kapslem by kręcić tarczą. Klikaj guzik by zatwierdzić zapadkę.",
+    "mouse": null,
+    "keys": null
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 5
+}

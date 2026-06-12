@@ -1,0 +1,29 @@
+{
+  "title": "Triki Dungeon",
+  "emoji": "🏰",
+  "description": "Jasny loch 2.0: żabka idzie tam, gdzie przechylisz kapsel, strzał sam celuje! Szukaj schodów, zbieraj skarby.",
+  "difficulty": "Średnia",
+  "color": "purple",
+  "controls": {
+    "ble": "Przechylaj kapsel = ruch żabki, guzik = strzał (auto-celowanie)",
+    "mouse": "Żabka idzie za kursorem / palcem, klik = strzał",
+    "keys": "WSAD / strzałki = ruch, Spacja = strzał"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "scheme": "tilt",
+  "order": 7,
+  "ctrlModes": [
+    {
+      "id": "tilt",
+      "label": "↔️ Przechył",
+      "scheme": "tilt"
+    },
+    {
+      "id": "swing",
+      "label": "👋 Machnięcie",
+      "scheme": "swing"
+    }
+  ],
+  "tag": "rpg"
+}

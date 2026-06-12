@@ -1,0 +1,21 @@
+Options -Indexes
+
+# HTML — zawsze świeże
+<FilesMatch "\.html$">
+    Header always set Cache-Control "no-cache, no-store, must-revalidate"
+    Header always set Pragma "no-cache"
+    Header always set Expires "0"
+</FilesMatch>
+
+# Statyczne assety z ?v= — cache na rok
+<FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
+    Header always set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+
+# Blokada bezpośredniego dostępu do data/
+RewriteEngine On
+RewriteRule ^data/ - [F,L]
+
+# Routing API → api.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^api(/.*)?$ api.php [QSA,L]

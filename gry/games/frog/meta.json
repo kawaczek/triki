@@ -1,0 +1,17 @@
+{
+  "title": "Żabka łapie muchy",
+  "emoji": "🐸",
+  "description": "Złap jak najwięcej much zanim skończy się czas!",
+  "difficulty": "Trudna",
+  "color": "purple",
+  "controls": {
+    "ble": "Przechylaj kapslem — i kliknij żeby złapać muchę",
+    "mouse": "Przesuń żabkę i kliknij w muchę",
+    "keys": null
+  },
+  "hasScore": true,
+  "scoreUnit": "much",
+  "scheme": "tilt",
+  "order": 3,
+  "tag": "arcade"
+}

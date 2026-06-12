@@ -1,0 +1,1 @@
+{"title":"Minutnik","emoji":"⏳","type":"app","tag":"app","description":"Pochyl żeby ustawić czas, potrząśnij żeby startować. Piszczy gdy koniec.","color":"orange","controls":{"ble":"Strzałki = czas, Potrząśnij = start/pauza","mouse":"Kliknij +/−","keys":"Strzałki = czas, Spacja = start/pauza, R = reset"},"hasScore":false,"skipCalib":true,"order":15}

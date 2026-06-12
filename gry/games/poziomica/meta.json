@@ -1,0 +1,17 @@
+{
+  "title": "Poziomica",
+  "emoji": "🫧",
+  "type": "app",
+  "tag": "app",
+  "description": "Bąbelek pokazuje przechył kapsla w czasie rzeczywistym. Połóż na czymś i sprawdź czy jest poziomo!",
+  "difficulty": "",
+  "color": "green",
+  "controls": {
+    "ble": "Trzymaj kapsla — bąbelek reaguje na przechył",
+    "mouse": "Przesuń mysz — symuluje przechył",
+    "keys": "Strzałki = symuluj przechył"
+  },
+  "hasScore": false,
+  "skipCalib": true,
+  "order": 11
+}

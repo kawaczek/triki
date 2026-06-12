@@ -1,0 +1,1 @@
+{"title":"Live Sensor","emoji":"📡","type":"app","tag":"app","description":"Wykresy na żywo wszystkich 6 osi kapsla: żyroskop i akcelerometr w czasie rzeczywistym.","color":"blue","controls":{"ble":"Kręć i pochylaj kapsel żeby zobaczyć dane","mouse":"Brak — potrzebny kapsel BLE","keys":"1-6 = włącz/wyłącz oś, R = wyczyść"},"hasScore":false,"skipCalib":true,"order":24}

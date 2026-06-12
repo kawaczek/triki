@@ -1,0 +1,17 @@
+{
+  "title": "Catch the Dot",
+  "emoji": "🎯",
+  "description": "Złap jak najwięcej kropek zanim skończy się czas!",
+  "difficulty": "Łatwa",
+  "color": "green",
+  "controls": {
+    "ble": "Przechylaj kapslem — łap kropki",
+    "mouse": "Przesuń mysz — łap kropki",
+    "keys": null
+  },
+  "hasScore": true,
+  "scoreUnit": "kropek",
+  "scheme": "swing",
+  "order": 1,
+  "tag": "arcade"
+}

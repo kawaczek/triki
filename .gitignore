@@ -1,0 +1,31 @@
+# Flutter / Dart
+triki_app/build/
+triki_app/.dart_tool/
+triki_app/.idea/
+triki_app/android/.gradle/
+triki_app/android/local.properties
+triki_app/*.apk
+triki_app/android/app/debug/
+triki_app/android/app/release/
+triki_app/android/app/profile/
+triki_app/.flutter-plugins
+triki_app/.flutter-plugins-dependencies
+
+# .NET / C#
+TrikiReader/bin/
+TrikiReader/obj/
+TrikiReader/TrikiReader.Tests/bin/
+TrikiReader/TrikiReader.Tests/obj/
+*.user
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Game server data (logs, scores, profiles — live only on server)
+gry/data/
+
+# Editor
+.vscode/
+.DS_Store

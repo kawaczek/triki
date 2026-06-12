@@ -1,0 +1,17 @@
+{
+  "title": "Rytm",
+  "emoji": "🎵",
+  "description": "Nuty opadają z góry — szybki ruch kapslem gdy dotrą do paska. Timing to wszystko!",
+  "difficulty": "Średnia",
+  "color": "purple",
+  "controls": {
+    "ble": "Szybki ruch kapslem gdy nuta jest na zielonym pasku",
+    "mouse": "Kliknij gdy nuta jest na pasku",
+    "keys": "Spacja = uderzenie"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "scheme": "tilt",
+  "order": 10,
+  "tag": "rhythm"
+}
