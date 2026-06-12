@@ -32,7 +32,7 @@ fi
 echo "→ upload na $FTP_HOST…"
 lftp -u "$FTP_GRY_USER,$FTP_GRY_PASS" "$FTP_HOST" << EOF
 set ssl:verify-certificate no
-mirror -R --parallel=4 \
+mirror -R --parallel=4 --ignore-time --transfer-all \
   --exclude-glob=data/ \
   --exclude-glob=__pycache__/ \
   --exclude-glob=*.log \
