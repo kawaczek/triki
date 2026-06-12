@@ -1,0 +1,17 @@
+{
+  "title": "Metronom",
+  "emoji": "🥁",
+  "type": "app",
+  "tag": "app",
+  "description": "Wbij rytm kapslem lub przyciskiem — metronom liczy BPM i bije dalej. Dla muzyków i tancerzy.",
+  "difficulty": "",
+  "color": "purple",
+  "controls": {
+    "ble": "Potrząśnij lub wciśnij przycisk żeby wbić rytm. Tilt w górę/dół = +/-5 BPM",
+    "mouse": "Kliknij żeby wbić rytm",
+    "keys": "Spacja = tap, strzałki = zmień BPM, R = reset"
+  },
+  "hasScore": false,
+  "skipCalib": true,
+  "order": 13
+}

@@ -977,10 +977,11 @@ async function loadGames() {
 
 const TABS = [
   { tag: '',          label: '✦ Wszystkie' },
+  { tag: '__games',   label: '🎮 Gry'      },
+  { tag: '__apps',    label: '📱 Apki'     },
   { tag: 'arcade',    label: '🕹 Arcade'   },
   { tag: 'skill',     label: '🎯 Zręczność'},
   { tag: 'puzzle',    label: '🧩 Puzzle'   },
-  { tag: 'rpg',       label: '🏰 RPG'      },
 ];
 
 function renderTabBar() {
@@ -997,7 +998,16 @@ function renderTabBar() {
 }
 
 function renderCards() {
-  const filtered = _activeTag ? games.filter(g => g.tag === _activeTag) : games;
+  let filtered;
+  if (_activeTag === '__games') {
+    filtered = games.filter(g => g.type !== 'app');
+  } else if (_activeTag === '__apps') {
+    filtered = games.filter(g => g.type === 'app');
+  } else if (_activeTag) {
+    filtered = games.filter(g => g.tag === _activeTag);
+  } else {
+    filtered = games;
+  }
   if (!filtered.length) {
     gameCards.innerHTML = '<p style="text-align:center;opacity:.4;padding:24px 0">Brak gier w tej kategorii</p>';
     return;
@@ -1008,6 +1018,7 @@ function renderCards() {
     const card = document.createElement('div');
     card.className = `game-card ${g.color || 'green'}`;
     card.style.animationDelay = `${i * 55}ms`;
+    const isApp = g.type === 'app';
     card.innerHTML = `
       <div class="card-corners"></div>
       <div class="card-icon">${g.emoji || '🎮'}</div>
@@ -1018,7 +1029,7 @@ function renderCards() {
         </div>
         <div class="card-desc">${esc(g.description || '')}</div>
         ${hs !== null ? `<div class="card-hs">🏆 Rekord: <b>${hs}</b> ${esc(g.scoreUnit || 'pkt')}</div>` : ''}
-        <button class="play-btn">▶ GRAJ</button>
+        <button class="play-btn">${isApp ? '▶ OTWÓRZ' : '▶ GRAJ'}</button>
       </div>`;
     card.addEventListener('click', () => openGame(g));
     gameCards.appendChild(card);
@@ -1121,8 +1132,8 @@ function showStartOverlay(meta) {
     : '';
 
   btnStart.onclick = async () => {
-    if (triki.connected) {
-      await startCalib();   // zawsze przed grą gdy kapsel podłączony
+    if (triki.connected && !current?.meta?.skipCalib) {
+      await startCalib();
     }
     ovStart.classList.add('hidden');
     startGame();

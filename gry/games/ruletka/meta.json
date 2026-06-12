@@ -1,0 +1,17 @@
+{
+  "title": "Ruletka",
+  "emoji": "🎡",
+  "type": "app",
+  "tag": "app",
+  "description": "Kręć kołem losu! TAK/NIE i inne. Potrząśnij kapslem żeby zakręcić.",
+  "difficulty": "",
+  "color": "orange",
+  "controls": {
+    "ble": "Potrząśnij kapslem żeby zakręcić",
+    "mouse": "Kliknij żeby zakręcić",
+    "keys": "Spacja = kręć, strzałki = zmień zestaw"
+  },
+  "hasScore": false,
+  "skipCalib": true,
+  "order": 14
+}

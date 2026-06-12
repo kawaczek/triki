@@ -26,12 +26,12 @@ const LAST_MS  = NOTES_TEMPLATE[NOTES_TEMPLATE.length - 1];
 const GAME_MS  = LAST_MS + BEAT_MS * 3;
 
 export default class RytmGame {
-  constructor(canvas, triki) {
+  constructor(canvas, ctx, triki, emit) {
     this.canvas = canvas;
-    this.ctx    = canvas.getContext('2d');
+    this.ctx    = ctx;
     this.triki  = triki;
 
-    this._emit      = null;
+    this._emit      = emit;
     this._raf       = null;
     this._startTime = 0;
     this._state     = 'idle';

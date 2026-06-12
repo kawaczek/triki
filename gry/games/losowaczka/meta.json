@@ -1,0 +1,17 @@
+{
+  "title": "Losowaczka",
+  "emoji": "🎲",
+  "type": "app",
+  "tag": "app",
+  "description": "Potrząśnij kapslem żeby losować! Kość, moneta lub Magic 8-ball.",
+  "difficulty": "",
+  "color": "blue",
+  "controls": {
+    "ble": "Potrząśnij kapslem żeby losować",
+    "mouse": "Kliknij żeby losować",
+    "keys": "Spacja = losuj, strzałki = zmień tryb"
+  },
+  "hasScore": false,
+  "skipCalib": true,
+  "order": 12
+}
