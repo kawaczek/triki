@@ -1327,41 +1327,14 @@ window.addEventListener('resize', () => {
 });
 
 // ── input forwarding ──────────────────────────────────────
-canvas.addEventListener('mousemove', e => {
-  if (!current?.inst || triki.connected) return;
-  const r = canvas.getBoundingClientRect();
-  current.inst.onMouseMove?.((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
-});
-
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (!current?.inst || triki.connected) return;
-  const r  = canvas.getBoundingClientRect();
-  const t  = e.touches[0];
-  current.inst.onMouseMove?.((t.clientX - r.left) / r.width, (t.clientY - r.top) / r.height);
-}, {passive: false});
-
-canvas.addEventListener('click', e => {
-  if (!current?.inst) return;
-  const r = canvas.getBoundingClientRect();
-  current.inst.onClick?.((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
-});
-
-canvas.addEventListener('touchend', e => {
-  e.preventDefault();
-  if (!current?.inst) return;
-  const r = canvas.getBoundingClientRect();
-  const t = e.changedTouches[0];
-  current.inst.onClick?.((t.clientX - r.left) / r.width, (t.clientY - r.top) / r.height);
-}, {passive: false});
-
-document.addEventListener('keydown', e => {
-  current?.inst?.onKeyDown?.(e.code);
-});
-
-document.addEventListener('keyup', e => {
-  current?.inst?.onKeyUp?.(e.code);
-});
+// Wszystkie tradycyjne wejścia (mysz/klawiatura/dotyk na canvasie) są globalnie wyłączone.
+// Gry są sterowane wyłącznie za pomocą fizycznego kapsla Triki BLE.
+canvas.addEventListener('mousemove', e => {});
+canvas.addEventListener('touchmove', e => { e.preventDefault(); }, {passive: false});
+canvas.addEventListener('click', e => {});
+canvas.addEventListener('touchend', e => { e.preventDefault(); }, {passive: false});
+document.addEventListener('keydown', e => {});
+document.addEventListener('keyup', e => {});
 
 // ── utils ─────────────────────────────────────────────────
 function esc(s) {
