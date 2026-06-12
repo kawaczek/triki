@@ -1,0 +1,16 @@
+{
+  "title": "Atari 2600 Retro",
+  "emoji": "🕹️",
+  "description": "Poczuj klimat lat 80! Klasyczna gra retro na Atari 2600. Steruj przechyłem kapsla (lewo/prawo) i strzelaj kliknięciem!",
+  "difficulty": "Średnia",
+  "color": "orange",
+  "controls": {
+    "ble": "Przechyl kapsel w lewo/prawo aby się poruszać. Kliknij przycisk aby strzelić!",
+    "mouse": "Ruch myszą w poziomie = ruch. Kliknięcie = strzał.",
+    "keys": "Strzałki Lewo/Prawo = ruch. Spacja = strzał."
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 1,
+  "scheme": "tilt"
+}
