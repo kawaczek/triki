@@ -204,6 +204,8 @@ class _DashboardPageState extends State<DashboardPage>
   bool _invertY          = false;
   bool _enableDoubleClick = false;
   double _accelTapThreshold = 0.9;
+  double _airDeadzoneInner = 2.0;
+  double _airDeadzoneOuter = 6.0;
 
   // ── Calibration offsets ──────────────────────────────────
   double _offX = 0, _offY = 0, _offZ = 0, _accOffX = 0, _accOffY = 0;
@@ -338,6 +340,8 @@ class _DashboardPageState extends State<DashboardPage>
       _invertY          = p.getBool('invert_y') ?? false;
       _enableDoubleClick = p.getBool('enable_double_click') ?? false;
       _accelTapThreshold = p.getDouble('accel_tap_threshold') ?? 0.9;
+      _airDeadzoneInner  = p.getDouble('air_deadzone_inner') ?? 2.0;
+      _airDeadzoneOuter  = p.getDouble('air_deadzone_outer') ?? 6.0;
 
       // Load active device profile
       if (_savedDeviceId != null) {
@@ -705,9 +709,23 @@ class _DashboardPageState extends State<DashboardPage>
       if (!_scrollTriggered) {
         double dx = 0, dy = 0;
         if (_mouseMode == MouseMode.air) {
-          dx = -iGz * sx; dy = iGx * sy;
-          if (dx.abs() < dz) dx = 0;
-          if (dy.abs() < dz) dy = 0;
+          final r = sqrt(iGz * iGz + iGx * iGx);
+          if (r > 0) {
+            final ux = iGz / r;
+            final uy = iGx / r;
+            double factor = 0.0;
+            if (r > _airDeadzoneInner) {
+              if (r >= _airDeadzoneOuter) {
+                factor = 1.0;
+              } else {
+                final t = (r - _airDeadzoneInner) / (_airDeadzoneOuter - _airDeadzoneInner);
+                factor = t * t;
+              }
+            }
+            final speed = r * factor;
+            dx = -ux * speed * sx;
+            dy = uy * speed * sy;
+          }
         } else {
           const friction = 0.82;
           double inp = iAx, inp2 = iAy;
@@ -1315,6 +1333,57 @@ class _DashboardPageState extends State<DashboardPage>
             },
             color: cs.tertiary,
           ),
+          if (_mouseMode == MouseMode.air) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Martwa strefa żyroskopu (promień wew.): ${_airDeadzoneInner.toStringAsFixed(1)}',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  Slider(
+                    value: _airDeadzoneInner,
+                    min: 0.0,
+                    max: 10.0,
+                    onChanged: (v) {
+                      setState(() {
+                        _airDeadzoneInner = v;
+                        if (_airDeadzoneOuter < _airDeadzoneInner) {
+                          _airDeadzoneOuter = _airDeadzoneInner;
+                        }
+                      });
+                      _saveSetting('air_deadzone_inner', v);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 16, right: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Strefa przejściowa żyroskopu (promień zew.): ${_airDeadzoneOuter.toStringAsFixed(1)}',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  Slider(
+                    value: _airDeadzoneOuter,
+                    min: 0.0,
+                    max: 20.0,
+                    onChanged: (v) {
+                      setState(() {
+                        _airDeadzoneOuter = v;
+                        if (_airDeadzoneInner > _airDeadzoneOuter) {
+                          _airDeadzoneInner = _airDeadzoneOuter;
+                        }
+                      });
+                      _saveSetting('air_deadzone_outer', v);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
