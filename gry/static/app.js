@@ -876,6 +876,7 @@ async function startFullDiag() {
 // BLE UI
 // ════════════════════════════════════════════════════════
 triki.onStatus = () => {
+  updateStartOverlayButton();
   updateBlePanel();
   updateGameBleCh();
   
@@ -900,6 +901,20 @@ triki.onStatus = () => {
     savePlayer(player);
   }
 };
+
+function updateStartOverlayButton() {
+  if (gameView.style.display !== 'none' && !ovStart.classList.contains('hidden')) {
+    if (triki.connected) {
+      btnStart.textContent = "▶ START";
+      btnStart.className = "btn-primary green";
+      btnStart.style.background = ""; // przywróć kolor z CSS
+    } else {
+      btnStart.textContent = "🔌 POŁĄCZ KAPSEL";
+      btnStart.className = "btn-primary";
+      btnStart.style.background = "#f59e0b"; // kolor ostrzegawczy (pomarańczowy)
+    }
+  }
+}
 
 function updateBlePanel() {
   blePanel.className = 'ble-panel ' + (triki.connected ? 'connected' : triki.connecting ? 'connecting' : 'disconnected');
@@ -1123,11 +1138,9 @@ function showStartOverlay(meta) {
 
   const ctrl = meta.controls;
   if (ctrl) {
-    // podświetl aktywny sposób sterowania (BLE gdy kapsel podłączony)
+    // Pokazujemy WYŁĄCZNIE sterowanie kapslem BLE, ponieważ myszka i klawiatura są zablokowane!
     $('ov-start-controls').innerHTML =
-      (ctrl.ble   ? `<div class="${triki.connected ? 'ctrl-ble' : 'ctrl-mouse'}">🎮 ${esc(ctrl.ble)}</div>` : '') +
-      (ctrl.mouse ? `<div class="${triki.connected ? 'ctrl-mouse' : 'ctrl-ble'}">🖱️ ${esc(ctrl.mouse)}</div>` : '') +
-      (ctrl.keys  ? `<div class="ctrl-mouse">⌨️ ${esc(ctrl.keys)}</div>` : '');
+      ctrl.ble ? `<div class="ctrl-ble">🎮 ${esc(ctrl.ble)}</div>` : '';
   }
 
   // wybór trybu sterowania kapslem (np. Arkanoid: obrót vs przechył)
@@ -1160,8 +1173,19 @@ function showStartOverlay(meta) {
     ? `<span class="ov-hs-label">Twój rekord: <b>${hs} ${meta.scoreUnit||'pkt'}</b></span>`
     : '';
 
+  // Zaktualizuj tekst i styl przycisku w zależności od stanu połączenia
+  updateStartOverlayButton();
+
   btnStart.onclick = async () => {
-    if (triki.connected && !current?.meta?.skipCalib) {
+    if (!triki.connected) {
+      try {
+        await bleAction();
+      } catch (e) {
+        console.warn('[BLE] Connection cancelled', e);
+      }
+      return;
+    }
+    if (!current?.meta?.skipCalib) {
       await startCalib();
     }
     ovStart.classList.add('hidden');
