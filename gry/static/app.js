@@ -1072,6 +1072,13 @@ async function openGame(meta) {
   }
   const GameClass = mod.default;
 
+  // Dynamiczne SEO i routing
+  document.title = `${meta.title} - Gra na Kapsel BLE | Triki Games`;
+  const gameUrl = `?g=${meta.id}`;
+  if (window.location.search !== gameUrl) {
+    window.history.pushState({ inGame: true, gameId: meta.id }, '', gameUrl);
+  }
+
   // show game view
   hub.style.display      = 'none';
   gameView.style.display = 'flex';
@@ -1297,6 +1304,12 @@ function goHub(shouldGoBack = true) {
   renderTabBar();
   renderCards(); // odśwież lokalne rekordy na kartach
 
+  // Reset SEO
+  document.title = "Triki Games - Darmowe Gry Retro na Kapsel BLE | gry.kawak.pl";
+  if (!shouldGoBack) {
+    window.history.replaceState({}, '', '/');
+  }
+
   if (shouldGoBack && history.state?.inGame) {
     history.back();
   }
@@ -1466,7 +1479,18 @@ window._app = { bleAction, editProfile };
 loadPlayer();
 renderPlayerPanel();
 updateBlePanel();
-loadGames().then(() => renderTabBar());
+loadGames().then(() => {
+  renderTabBar();
+  // Obsługa URL query routing dla SEO (np. ?g=sejf)
+  const params = new URLSearchParams(window.location.search);
+  const gameId = params.get('g');
+  if (gameId) {
+    const meta = games.find(g => g.id === gameId);
+    if (meta) {
+      openGame(meta);
+    }
+  }
+});
 _requestWakeLock();
 
 // Czułość slider init
