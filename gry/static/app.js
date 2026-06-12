@@ -5,6 +5,10 @@ const COLORS = ['#22c55e','#3b82f6','#a855f7','#ef4444','#f59e0b'];
 const COLOR_NAMES = ['Zielony','Niebieski','Fioletowy','Czerwony','Żółty'];
 const LS_KEY = 'triki_player';
 
+// Wyciągnij wersję z adresu URL skryptu do cache-bustingu gier
+const scriptEl = document.querySelector('script[src*="app.js"]');
+const APP_VERSION = scriptEl ? (new URL(scriptEl.src, window.location.href).searchParams.get('v') || Date.now().toString()) : Date.now().toString();
+
 // ── state ────────────────────────────────────────────────
 const triki = new window.TrikiController();
 let player      = null;    // {nick, color, deviceId}
@@ -1089,7 +1093,7 @@ async function openGame(meta) {
   // dynamic import
   let mod;
   try {
-    mod = await import(`/games/${meta.id}/game.js`);
+    mod = await import(`/games/${meta.id}/game.js?v=${APP_VERSION}`);
   } catch(e) {
     console.error('[openGame] import error', e);
     return;
