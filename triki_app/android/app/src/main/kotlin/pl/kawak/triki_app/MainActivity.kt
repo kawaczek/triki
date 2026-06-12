@@ -5,8 +5,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Build
 import android.provider.Settings
+import android.view.KeyEvent
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -70,6 +73,67 @@ class MainActivity : FlutterActivity() {
                 "hideNotification" -> {
                     val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     nm.cancel(NOTIF_ID)
+                    result.success(true)
+                }
+                "showToast" -> {
+                    val message = call.argument<String>("message") ?: ""
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                    result.success(true)
+                }
+                "volumeUp" -> {
+                    val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
+                    result.success(true)
+                }
+                "volumeDown" -> {
+                    val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
+                    result.success(true)
+                }
+                "mediaPlayPause" -> {
+                    val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+                    audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+                    result.success(true)
+                }
+                "mediaNext" -> {
+                    val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT))
+                    audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT))
+                    result.success(true)
+                }
+                "mediaPrev" -> {
+                    val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                    audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+                    audioManager.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+                    result.success(true)
+                }
+                "socialSwipe" -> {
+                    val direction = call.argument<String>("direction") ?: "UP"
+                    val service = TrikiAccessibilityService.instance
+                    if (service != null) {
+                        service.performSwipe(direction)
+                        result.success(true)
+                    } else {
+                        result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                    }
+                }
+                "socialDoubleTap" -> {
+                    val service = TrikiAccessibilityService.instance
+                    if (service != null) {
+                        service.performDoubleTapAtCenter()
+                        result.success(true)
+                    } else {
+                        result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                    }
+                }
+                "keepScreenOn" -> {
+                    val keep = call.argument<Boolean>("keep") ?: false
+                    if (keep) {
+                        activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
                     result.success(true)
                 }
                 else -> result.notImplemented()

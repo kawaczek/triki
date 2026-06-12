@@ -40,6 +40,8 @@ class TrikiController {
     this._calibNeut = null;    // tymczasowe: neutral podczas kroku 1
     try { const s = localStorage.getItem('triki_calib_v2'); if (s) this._calibV2 = JSON.parse(s); } catch(_) {}
     this._rotDrift  = 0;       // offset gz ustawiany w chwili kalibracji (snapshot)
+    const _ai = localStorage.getItem('triki_auto_invert');
+    this.autoInvert  = _ai === '1';
   }
 
   // ── auto-connect do zapamiętanego urządzenia ──────────────
@@ -200,8 +202,27 @@ class TrikiController {
     } catch(_) { return CALIB_DEFAULTS[this.scheme] || CALIB_DEFAULTS.tilt; }
   }
 
-  get _ix() { return this.invertX ? -1 : 1; }
-  get _iy() { return this.invertY ? -1 : 1; }
+  get isFlipped() {
+    // az standardowo wynosi ~1.0 (dodatnie) gdy lezy guzikami do gory.
+    // az wynosi ~-1.0 gdy jest odwrocony rewersem do gory.
+    return this.az < -0.2;
+  }
+
+  get _ix() {
+    let inv = this.invertX;
+    if (this.autoInvert && this.isFlipped) {
+      inv = !inv;
+    }
+    return inv ? -1 : 1;
+  }
+
+  get _iy() {
+    let inv = this.invertY;
+    if (this.autoInvert && this.isFlipped) {
+      inv = !inv;
+    }
+    return inv ? -1 : 1;
+  }
 
   GX(dz) {
     if (this.scheme === 'rotate') {
@@ -259,6 +280,12 @@ class TrikiController {
   setSensitivity(v) {
     this.sensitivity = v;
     localStorage.setItem('triki_sensitivity', String(v));
+  }
+
+  setAutoInvert(on) {
+    this.autoInvert = on;
+    localStorage.setItem('triki_auto_invert', on ? '1' : '0');
+    this._emit();
   }
 
   _emit() { this.onStatus?.(); }

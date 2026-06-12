@@ -5,6 +5,7 @@ import android.accessibilityservice.GestureDescription
 import android.graphics.Color
 import android.graphics.Path
 import android.graphics.PixelFormat
+import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -163,5 +164,39 @@ class TrikiAccessibilityService : AccessibilityService() {
         }
         val stroke = GestureDescription.StrokeDescription(path, 0, 200)
         dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+    }
+
+    fun performSwipe(direction: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        val dm = resources.displayMetrics
+        val width = dm.widthPixels.toFloat()
+        val height = dm.heightPixels.toFloat()
+        
+        val startY = if (direction == "UP") height * 0.8f else height * 0.2f
+        val endY = if (direction == "UP") height * 0.2f else height * 0.8f
+        val x = width / 2f
+
+        val path = Path().apply {
+            moveTo(x, startY)
+            lineTo(x, endY)
+        }
+        val stroke = GestureDescription.StrokeDescription(path, 0, 250)
+        dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+    }
+
+    fun performDoubleTapAtCenter() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        val dm = resources.displayMetrics
+        val x = dm.widthPixels / 2f
+        val y = dm.heightPixels / 2f
+
+        val path1 = Path().apply { moveTo(x, y) }
+        val path2 = Path().apply { moveTo(x, y) }
+        val s1 = GestureDescription.StrokeDescription(path1, 0, 60)
+        val s2 = GestureDescription.StrokeDescription(path2, 150, 60)
+        dispatchGesture(
+            GestureDescription.Builder().addStroke(s1).addStroke(s2).build(),
+            null, null
+        )
     }
 }

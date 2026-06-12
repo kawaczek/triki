@@ -14,6 +14,7 @@ import 'games_page.dart';
 
 enum MouseMode { air, table }
 enum ButtonOrientation { left, front, right }
+enum ControllerMode { mouse, media, social }
 
 class DeviceProfile {
   final String id;
@@ -190,6 +191,12 @@ class _DashboardPageState extends State<DashboardPage>
   bool _scrollMode      = false; // button held → scroll instead of click
   MouseMode         _mouseMode   = MouseMode.air;
   ButtonOrientation _btnOrientation = ButtonOrientation.left;
+  ControllerMode    _controllerMode = ControllerMode.mouse;
+  DateTime?         _lastShakeTime;
+  int               _shakeCount = 0;
+  int               _lastVolTime = 0;
+  bool              _trackLatch = false;
+  bool              _swipeLatch = false;
 
   // ── Calibration offsets ──────────────────────────────────
   double _offX = 0, _offY = 0, _offZ = 0, _accOffX = 0, _accOffY = 0;
@@ -264,6 +271,7 @@ class _DashboardPageState extends State<DashboardPage>
     _txSub?.cancel();
     _scanSub?.cancel();
     _disconnect();
+    _ch.invokeMethod('keepScreenOn', {'keep': false}).catchError((_) {});
     _ch.invokeMethod('hideNotification').catchError((_) {});
     super.dispose();
   }
@@ -421,10 +429,12 @@ class _DashboardPageState extends State<DashboardPage>
           _reconnectAttempts = 0;
           _discoverServices(dev);
           _updateNotification();
+          _ch.invokeMethod('keepScreenOn', {'keep': true}).catchError((_) {});
         } else if (s == BluetoothConnectionState.disconnected) {
           _cleanupConn();
           _scheduleReconnect();
           _updateNotification();
+          _ch.invokeMethod('keepScreenOn', {'keep': false}).catchError((_) {});
         }
       });
       await dev.connect(autoConnect: autoConnect)
@@ -576,8 +586,13 @@ class _DashboardPageState extends State<DashboardPage>
             // Long press → right click
             _triggerRightClick();
           } else {
-            // Short press → detect double click
-            final sinceLastClick = DateTime.now().difference(_lastClickTime).inMilliseconds;
+            // Short press → detect double click with hardware bouncing filter
+            final now = DateTime.now();
+            final sinceLastClick = now.difference(_lastClickTime).inMilliseconds;
+            if (sinceLastClick < 180) {
+              // Bouncing / szum BLE - ignorujemy to kliknięcie całkowicie
+              return;
+            }
             if (sinceLastClick < 400) {
               _clickCount++;
               if (_clickCount >= 2) {
@@ -591,7 +606,7 @@ class _DashboardPageState extends State<DashboardPage>
                 if (_clickCount == 1) { _triggerClick(); _clickCount = 0; }
               });
             }
-            _lastClickTime = DateTime.now();
+            _lastClickTime = now;
           }
         }
       }
@@ -615,6 +630,9 @@ class _DashboardPageState extends State<DashboardPage>
     // Feed shared sensor stream for mini-games
     sensorStream.value = TrikiSensorData(gx: gx, gy: gy, gz: gz, ax: ax, ay: ay, az: az);
 
+    // Wykrywanie wstrząsów (Shake Detection) do zmiany trybu
+    _detectShake(ax, ay, az);
+
     if (!_mouseEnabled || !_serviceRunning || _activeProfile == null) return;
     if (gameActive.value) return; // pause mouse when game running
 
@@ -627,36 +645,83 @@ class _DashboardPageState extends State<DashboardPage>
     if (_btnOrientation == ButtonOrientation.front) { iGx = gy; iGz = -gx; iAx = ay; iAy = -ax; }
     else if (_btnOrientation == ButtonOrientation.right) { iGx = -gx; iGz = -gz; iAx = -ax; iAy = -ay; }
 
-    // ── Scroll mode (button held + tilt) ─────────────────
-    if (_btnPressed && !_scrollTriggered) {
-      final heldMs = DateTime.now().difference(_btnPressTime).inMilliseconds;
-      if (heldMs > 300 && (iGz.abs() > 5 || iGx.abs() > 5)) {
-        _scrollTriggered = true;
-        final sdx = (iGz.abs() > iGx.abs()) ? (iGz > 0 ? 1.0 : -1.0) : 0.0;
-        final sdy = (iGx.abs() > iGz.abs()) ? (iGx > 0 ? 1.0 : -1.0) : 0.0;
-        _ch.invokeMethod('scroll', {'dx': sdx, 'dy': sdy});
-        setState(() => _totalScrolls++);
+    if (_controllerMode == ControllerMode.mouse) {
+      // ── TRYB MYSZKI (Domyślne sterowanie kursorem) ───────────────────
+      // Scroll mode (button held + tilt)
+      if (_btnPressed && !_scrollTriggered) {
+        final heldMs = DateTime.now().difference(_btnPressTime).inMilliseconds;
+        if (heldMs > 300 && (iGz.abs() > 5 || iGx.abs() > 5)) {
+          _scrollTriggered = true;
+          final sdx = (iGz.abs() > iGx.abs()) ? (iGz > 0 ? 1.0 : -1.0) : 0.0;
+          final sdy = (iGx.abs() > iGz.abs()) ? (iGx > 0 ? 1.0 : -1.0) : 0.0;
+          _ch.invokeMethod('scroll', {'dx': sdx, 'dy': sdy});
+          setState(() => _totalScrolls++);
+        }
       }
-    }
 
-    // ── Move cursor ───────────────────────────────────────
-    if (!_scrollTriggered) {
-      double dx = 0, dy = 0;
-      if (_mouseMode == MouseMode.air) {
-        dx = -iGz * sx; dy = iGx * sy;
-        if (dx.abs() < dz) dx = 0;
-        if (dy.abs() < dz) dy = 0;
-      } else {
-        const friction = 0.82;
-        double inp = iAx, inp2 = iAy;
-        if (inp.abs() < 0.08) inp = 0;
-        if (inp2.abs() < 0.08) inp2 = 0;
-        _vx = (_vx + inp  * 9.81 * 0.02) * friction;
-        _vy = (_vy - inp2 * 9.81 * 0.02) * friction;
-        dx = _vx * sx * 25; dy = _vy * sy * 25;
+      // Move cursor
+      if (!_scrollTriggered) {
+        double dx = 0, dy = 0;
+        if (_mouseMode == MouseMode.air) {
+          dx = -iGz * sx; dy = iGx * sy;
+          if (dx.abs() < dz) dx = 0;
+          if (dy.abs() < dz) dy = 0;
+        } else {
+          const friction = 0.82;
+          double inp = iAx, inp2 = iAy;
+          if (inp.abs() < 0.08) inp = 0;
+          if (inp2.abs() < 0.08) inp2 = 0;
+          _vx = (_vx + inp  * 9.81 * 0.02) * friction;
+          _vy = (_vy - inp2 * 9.81 * 0.02) * friction;
+          dx = _vx * sx * 25; dy = _vy * sy * 25;
+        }
+        if (dx.abs() > 0.1 || dy.abs() > 0.1) {
+          _ch.invokeMethod('moveCursor', {'dx': dx, 'dy': dy});
+        }
       }
-      if (dx.abs() > 0.1 || dy.abs() > 0.1) {
-        _ch.invokeMethod('moveCursor', {'dx': dx, 'dy': dy});
+    } else if (_controllerMode == ControllerMode.media) {
+      // ── TRYB MEDIA (Sterowanie muzyką/głośnością) ─────────────────
+      // Regulacja głośności: obrót kapsla (iGz) CW -> głośniej, CCW -> ciszej
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (nowMs - _lastVolTime > 150) {
+        if (iGz > 35) {
+          _ch.invokeMethod('volumeUp');
+          _lastVolTime = nowMs;
+        } else if (iGz < -35) {
+          _ch.invokeMethod('volumeDown');
+          _lastVolTime = nowMs;
+        }
+      }
+
+      // Zmiana utworów: przechylenie w lewo (iAx < -0.4) / w prawo (iAx > 0.4) z zatrzaskiem
+      if (!_trackLatch) {
+        if (iAx > 0.4) {
+          _ch.invokeMethod('mediaNext');
+          _trackLatch = true;
+        } else if (iAx < -0.4) {
+          _ch.invokeMethod('mediaPrev');
+          _trackLatch = true;
+        }
+      } else {
+        if (iAx.abs() < 0.15) {
+          _trackLatch = false;
+        }
+      }
+    } else if (_controllerMode == ControllerMode.social) {
+      // ── TRYB SOCIAL (Przewijanie Instagram / TikTok) ──────────────
+      // Przewijanie filmów: pochylenie przód (swipe up) / tył (swipe down) z zatrzaskiem
+      if (!_swipeLatch) {
+        if (iAy < -0.4) { // pochylenie w przód
+          _ch.invokeMethod('socialSwipe', {'direction': 'UP'});
+          _swipeLatch = true;
+        } else if (iAy > 0.4) { // pochylenie w tył
+          _ch.invokeMethod('socialSwipe', {'direction': 'DOWN'});
+          _swipeLatch = true;
+        }
+      } else {
+        if (iAy.abs() < 0.15) {
+          _swipeLatch = false;
+        }
       }
     }
   }
@@ -666,9 +731,71 @@ class _DashboardPageState extends State<DashboardPage>
     return (v & 0x8000) != 0 ? v - 0x10000 : v;
   }
 
-  void _triggerClick()       { if (_serviceRunning) { _ch.invokeMethod('click');       setState(() => _totalClicks++); } }
-  void _triggerRightClick()  { if (_serviceRunning) { _ch.invokeMethod('rightClick');  } }
-  void _triggerDoubleClick() { if (_serviceRunning) { _ch.invokeMethod('doubleClick'); setState(() => _totalClicks += 2); } }
+  void _triggerClick() {
+    if (!_serviceRunning) return;
+    if (_controllerMode == ControllerMode.mouse) {
+      _ch.invokeMethod('click');
+      setState(() => _totalClicks++);
+    } else if (_controllerMode == ControllerMode.media) {
+      _ch.invokeMethod('mediaPlayPause');
+    } else if (_controllerMode == ControllerMode.social) {
+      _ch.invokeMethod('socialDoubleTap');
+    }
+  }
+
+  void _triggerDoubleClick() {
+    if (!_serviceRunning) return;
+    if (_controllerMode == ControllerMode.mouse) {
+      _ch.invokeMethod('doubleClick');
+      setState(() => _totalClicks += 2);
+    }
+  }
+
+  void _triggerRightClick() {
+    if (!_serviceRunning) return;
+    if (_controllerMode == ControllerMode.mouse) {
+      _ch.invokeMethod('rightClick');
+    }
+  }
+
+  void _detectShake(double ax, double ay, double az) {
+    double force = sqrt(ax * ax + ay * ay + az * az);
+    if (force > 2.3) {
+      final now = DateTime.now();
+      if (_lastShakeTime == null || now.difference(_lastShakeTime!).inMilliseconds > 250) {
+        if (_lastShakeTime != null && now.difference(_lastShakeTime!).inMilliseconds < 850) {
+          _shakeCount++;
+          if (_shakeCount >= 2) {
+            _cycleMode();
+            _shakeCount = 0;
+          }
+        } else {
+          _shakeCount = 1;
+        }
+        _lastShakeTime = now;
+      }
+    }
+  }
+
+  void _cycleMode() {
+    setState(() {
+      int nextIdx = (_controllerMode.index + 1) % ControllerMode.values.length;
+      _controllerMode = ControllerMode.values[nextIdx];
+      _vx = 0; _vy = 0;
+      _trackLatch = false;
+      _swipeLatch = false;
+    });
+
+    final modeLabels = {
+      ControllerMode.mouse: 'Tryb: Myszka 🖱️',
+      ControllerMode.media: 'Tryb: Media 📺',
+      ControllerMode.social: 'Tryb: Instagram 📸',
+    };
+    final activeLabel = modeLabels[_controllerMode] ?? 'Tryb: Myszka';
+
+    _ch.invokeMethod('showToast', {'message': activeLabel}).catchError((_) {});
+    _updateNotification();
+  }
 
   // ═══════════════════════════════════════════════════════
   //  MISC
@@ -683,9 +810,15 @@ class _DashboardPageState extends State<DashboardPage>
 
   void _updateNotification() {
     if (_connState == BluetoothConnectionState.connected) {
+      final modeLabels = {
+        ControllerMode.mouse: 'Myszka 🖱️',
+        ControllerMode.media: 'Media 📺',
+        ControllerMode.social: 'Instagram 📸',
+      };
+      final modeLabel = modeLabels[_controllerMode] ?? 'Mysz';
       _ch.invokeMethod('showNotification', {
-        'title': 'Triki-myszka 🐾',
-        'body': 'Połączono: ${_savedDeviceName ?? "Kapsel"}'
+        'title': 'Status Triki: $modeLabel 🐾',
+        'body': 'Urządzenie: ${_savedDeviceName ?? "Kapsel"}'
             '${_batteryLevel >= 0 ? " | Bat: $_batteryLevel%" : ""}',
       }).catchError((_) {});
     } else {
@@ -889,7 +1022,24 @@ class _DashboardPageState extends State<DashboardPage>
                   ),
                 ),
               ),
-              if (!_serviceRunning)
+              if (_isConnected) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cs.secondary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: cs.secondary.withOpacity(0.4)),
+                  ),
+                  child: Text(
+                    _controllerMode == ControllerMode.mouse ? 'Myszka 🖱️' :
+                    _controllerMode == ControllerMode.media ? 'Media 📺' : 'Social 📸',
+                    style: TextStyle(fontSize: 11, color: cs.secondary, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+              if (!_serviceRunning) ...[
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -899,6 +1049,7 @@ class _DashboardPageState extends State<DashboardPage>
                   ),
                   child: const Text('Brak usługi', style: TextStyle(fontSize: 11, color: Colors.orange)),
                 ),
+              ],
             ],
           ),
 
