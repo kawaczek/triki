@@ -29,6 +29,17 @@ class MainActivity : FlutterActivity() {
                 "isServiceRunning" -> {
                     result.success(TrikiAccessibilityService.instance != null)
                 }
+                "setCursorOverlayVisible" -> {
+                    val visible = call.argument<Boolean>("visible") ?: true
+                    TrikiAccessibilityService.isOverlayEnabled = visible
+                    val service = TrikiAccessibilityService.instance
+                    if (service != null) {
+                        service.setCursorOverlayVisible(visible)
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                }
                 "moveCursor" -> {
                     val dx = call.argument<Double>("dx")?.toFloat() ?: 0f
                     val dy = call.argument<Double>("dy")?.toFloat() ?: 0f

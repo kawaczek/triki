@@ -18,6 +18,7 @@ class TrikiAccessibilityService : AccessibilityService() {
     companion object {
         var instance: TrikiAccessibilityService? = null
             private set
+        var isOverlayEnabled = true
     }
 
     private var windowManager: WindowManager? = null
@@ -39,7 +40,9 @@ class TrikiAccessibilityService : AccessibilityService() {
         screenHeight = dm.heightPixels
         cursorX = screenWidth  / 2f
         cursorY = screenHeight / 2f
-        createCursorOverlay()
+        if (isOverlayEnabled) {
+            createCursorOverlay()
+        }
         Log.d("TrikiService", "Service connected ${screenWidth}x${screenHeight}")
     }
 
@@ -115,6 +118,19 @@ class TrikiAccessibilityService : AccessibilityService() {
             try { windowManager?.removeView(it) } catch (_: Exception) {}
         }
         cursorView = null
+    }
+
+    fun setCursorOverlayVisible(visible: Boolean) {
+        isOverlayEnabled = visible
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            if (visible) {
+                if (cursorView == null) {
+                    createCursorOverlay()
+                }
+            } else {
+                removeCursorOverlay()
+            }
+        }
     }
 
     // ── Public actions ───────────────────────────────────────────────────────

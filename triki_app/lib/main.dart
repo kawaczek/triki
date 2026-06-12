@@ -198,6 +198,13 @@ class _DashboardPageState extends State<DashboardPage>
   bool              _trackLatch = false;
   bool              _swipeLatch = false;
 
+  bool _showCursorOverlay = false;
+  bool _autoFlipEnabled   = true;
+  bool _invertX          = false;
+  bool _invertY          = false;
+  bool _enableDoubleClick = false;
+  double _accelTapThreshold = 0.9;
+
   // ── Calibration offsets ──────────────────────────────────
   double _offX = 0, _offY = 0, _offZ = 0, _accOffX = 0, _accOffY = 0;
 
@@ -325,6 +332,12 @@ class _DashboardPageState extends State<DashboardPage>
       _offZ = p.getDouble('offset_z') ?? 0.0;
       _accOffX = p.getDouble('accel_offset_x') ?? 0.0;
       _accOffY = p.getDouble('accel_offset_y') ?? 0.0;
+      _showCursorOverlay = p.getBool('show_cursor_overlay') ?? false;
+      _autoFlipEnabled   = p.getBool('auto_flip_enabled') ?? true;
+      _invertX          = p.getBool('invert_x') ?? false;
+      _invertY          = p.getBool('invert_y') ?? false;
+      _enableDoubleClick = p.getBool('enable_double_click') ?? false;
+      _accelTapThreshold = p.getDouble('accel_tap_threshold') ?? 0.9;
 
       // Load active device profile
       if (_savedDeviceId != null) {
@@ -340,6 +353,12 @@ class _DashboardPageState extends State<DashboardPage>
         );
       }
     });
+
+    try {
+      await _ch.invokeMethod('setCursorOverlayVisible', {'visible': _showCursorOverlay});
+    } catch (e) {
+      debugPrint('Error invoking setCursorOverlayVisible: $e');
+    }
 
     if (_savedDeviceId != null) _connectToSaved();
   }
@@ -594,18 +613,22 @@ class _DashboardPageState extends State<DashboardPage>
               // Bouncing / szum BLE - ignorujemy to kliknięcie całkowicie
               return;
             }
-            if (sinceLastClick < 400) {
-              _clickCount++;
-              if (_clickCount >= 2) {
-                _triggerDoubleClick();
-                _clickCount = 0;
-              }
+            if (!_enableDoubleClick) {
+              _triggerClick();
             } else {
-              _clickCount = 1;
-              // Delay single-click to allow double-click window
-              Future.delayed(const Duration(milliseconds: 400), () {
-                if (_clickCount == 1) { _triggerClick(); _clickCount = 0; }
-              });
+              if (sinceLastClick < 400) {
+                _clickCount++;
+                if (_clickCount >= 2) {
+                  _triggerDoubleClick();
+                  _clickCount = 0;
+                }
+              } else {
+                _clickCount = 1;
+                // Delay single-click to allow double-click window
+                Future.delayed(const Duration(milliseconds: 400), () {
+                  if (_clickCount == 1) { _triggerClick(); _clickCount = 0; }
+                });
+              }
             }
             _lastClickTime = now;
           }
@@ -616,7 +639,7 @@ class _DashboardPageState extends State<DashboardPage>
     // ── Accel tap click ──────────────────────────────────
     if (_accelTapClick) {
       final diff = (az - _lastAccelZ).abs();
-      if (diff > 0.9) {
+      if (diff > _accelTapThreshold) {
         final now = DateTime.now();
         if (now.difference(_lastClickTime).inMilliseconds > 450) {
           _lastClickTime = now;
@@ -647,10 +670,20 @@ class _DashboardPageState extends State<DashboardPage>
     else if (_btnOrientation == ButtonOrientation.right) { iGx = -gx; iGz = -gz; iAx = -ax; iAy = -ay; }
 
     // Automatyczna korekcja kierunków jeśli kapsel jest odwrócony (rewersem do góry)
-    if (az < -0.2) {
+    if (_autoFlipEnabled && az < -0.2) {
       iGx = -iGx;
       iGz = -iGz;
       iAx = -iAx;
+      iAy = -iAy;
+    }
+
+    // Ręczna inwersja osi X i Y
+    if (_invertX) {
+      iGz = -iGz;
+      iAx = -iAx;
+    }
+    if (_invertY) {
+      iGx = -iGx;
       iAy = -iAy;
     }
 
@@ -1155,11 +1188,23 @@ class _DashboardPageState extends State<DashboardPage>
           // Toggles
           _ToggleRow(
             icon: Icons.touch_app,
-            label: 'Przycisk fizyczny (klik/długi=PPM/podwójny)',
+            label: 'Przycisk fizyczny (klik/długi=PPM)',
             value: _physicalBtnClick,
             onChanged: (v) { setState(() => _physicalBtnClick = v); _saveSetting('physical_button_click', v); },
             color: cs.primary,
           ),
+          if (_physicalBtnClick) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: _ToggleRow(
+                icon: Icons.double_tap,
+                label: 'Obsługa podwójnego kliknięcia (lag 400ms)',
+                value: _enableDoubleClick,
+                onChanged: (v) { setState(() => _enableDoubleClick = v); _saveSetting('enable_double_click', v); },
+                color: cs.primary.withOpacity(0.7),
+              ),
+            ),
+          ],
           _ToggleRow(
             icon: Icons.vibration,
             label: 'Klik uderzeniem (accel tap)',
@@ -1167,6 +1212,33 @@ class _DashboardPageState extends State<DashboardPage>
             onChanged: (v) { setState(() => _accelTapClick = v); _saveSetting('accel_tap_click', v); },
             color: cs.secondary,
           ),
+          if (_accelTapClick) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 32, right: 16, top: 4, bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Czułość uderzenia (mniejsza = bardziej czuły): ${_accelTapThreshold.toStringAsFixed(2)} g',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        Slider(
+                          value: _accelTapThreshold,
+                          min: 0.3,
+                          max: 3.0,
+                          onChanged: (v) {
+                            setState(() => _accelTapThreshold = v);
+                            _saveSetting('accel_tap_threshold', v);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           const SizedBox(height: 12),
           // Calibration
@@ -1197,6 +1269,52 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ),
           ]),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          const Text('Zaawansowane', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 6),
+          _ToggleRow(
+            icon: Icons.visibility,
+            label: 'Wskaźnik na ekranie (Overlay)',
+            value: _showCursorOverlay,
+            onChanged: (v) {
+              setState(() => _showCursorOverlay = v);
+              _saveSetting('show_cursor_overlay', v);
+              _ch.invokeMethod('setCursorOverlayVisible', {'visible': v});
+            },
+            color: cs.primary,
+          ),
+          _ToggleRow(
+            icon: Icons.flip,
+            label: 'Auto-odwracanie osi przy flipie',
+            value: _autoFlipEnabled,
+            onChanged: (v) {
+              setState(() => _autoFlipEnabled = v);
+              _saveSetting('auto_flip_enabled', v);
+            },
+            color: cs.secondary,
+          ),
+          _ToggleRow(
+            icon: Icons.swap_horiz,
+            label: 'Odwróć oś X (lewo/prawo)',
+            value: _invertX,
+            onChanged: (v) {
+              setState(() => _invertX = v);
+              _saveSetting('invert_x', v);
+            },
+            color: cs.tertiary,
+          ),
+          _ToggleRow(
+            icon: Icons.swap_vert,
+            label: 'Odwróć oś Y (góra/dół)',
+            value: _invertY,
+            onChanged: (v) {
+              setState(() => _invertY = v);
+              _saveSetting('invert_y', v);
+            },
+            color: cs.tertiary,
+          ),
         ],
       ),
     );
