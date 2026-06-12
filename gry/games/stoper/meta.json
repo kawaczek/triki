@@ -1,0 +1,1 @@
+{"title":"Stoper","emoji":"⏱️","type":"app","tag":"app","description":"Potrząśnij żeby start/pauza. Kliknij żeby okrążenie. Trzymaj R żeby reset.","color":"blue","controls":{"ble":"Potrząśnij = start/pauza, Przycisk = okrążenie","mouse":"Kliknij START, potem kliknij LAP","keys":"Spacja = start/pauza, L = okrążenie, R = reset"},"hasScore":false,"skipCalib":true,"order":16}

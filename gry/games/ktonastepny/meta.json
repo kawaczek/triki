@@ -1,0 +1,1 @@
+{"title":"Kto następny?","emoji":"👆","type":"app","tag":"app","description":"Ustaw liczbę graczy, potrząśnij kapslem — wylosuje kto idzie następny!","color":"blue","controls":{"ble":"Potrząśnij = losuj gracza","mouse":"Kliknij żeby losować","keys":"Spacja = losuj, +/− = liczba graczy"},"hasScore":false,"skipCalib":true,"order":20}

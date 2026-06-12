@@ -1,0 +1,1 @@
+{"title":"Licznik","emoji":"🔢","type":"app","tag":"app","description":"Dwa liczniki: potrząśnij kapslm (lewy) lub naciśnij przycisk/kliknij (prawy).","color":"green","controls":{"ble":"Potrząśnij = lewy licznik, Przycisk = prawy licznik","mouse":"Kliknij lewą połowę = lewy, prawą = prawy","keys":"Z = lewy, X = prawy, R = reset obu"},"hasScore":false,"skipCalib":true,"order":17}
