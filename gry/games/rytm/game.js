@@ -52,8 +52,6 @@ export default class RytmGame {
     this._audioCtx  = null;
   }
 
-  init(emit) { this._emit = emit; this.drawIdle(); }
-
   start() {
     if (this._raf) cancelAnimationFrame(this._raf);
     this._state     = 'playing';
@@ -67,7 +65,8 @@ export default class RytmGame {
     this._raf = requestAnimationFrame(() => this._tick());
   }
 
-  stop() { if (this._raf) cancelAnimationFrame(this._raf); this._raf = null; }
+  stop()    { if (this._raf) cancelAnimationFrame(this._raf); this._raf = null; }
+  destroy() { this.stop(); }
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -316,7 +315,8 @@ export default class RytmGame {
 
   // ── input ─────────────────────────────────────────────────────────────────
 
-  onClick()       { if (this._state === 'playing') this._doHit(); }
-  onMouseMove()   {}
-  onKey(key)      { if (this._state === 'playing' && (key === ' ' || key === 'Space')) this._doHit(); }
+  onClick()           { if (this._state === 'playing') this._doHit(); }
+  onMouseMove()       {}
+  onKeyDown(code)     { if (this._state === 'playing' && code === 'Space') this._doHit(); }
+  onKeyUp()           {}
 }

@@ -3,7 +3,7 @@ import { clamp } from '../../static/gameutils.js';
 const LEVEL_THR = 0.04;   // g — "poziomo" threshold
 const SCALE     = 3.2;    // jak bardzo bąbelek ucieka przy przechyle
 
-export default class PozioumicaGame {
+export default class PoziomicaGame {
   constructor(canvas, ctx, triki, emit) {
     this.canvas  = canvas;
     this.ctx     = ctx;
