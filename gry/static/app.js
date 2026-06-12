@@ -13,6 +13,9 @@ let current     = null;    // {meta, instance}
 let rafId       = null;
 let lastT       = 0;
 let _activeTag  = '';      // tab filter
+let filteredGames = [];    // tablica aktualnie wyświetlanych gier w hubie
+let selectedGameIndex = 0; // indeks aktualnie zaznaczonej gry
+let menuRotLatch = false;  // zatrzask do obracania w menu
 
 // ── DOM refs ─────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -1040,15 +1043,22 @@ function renderCards() {
   } else {
     filtered = games;
   }
+
+  filteredGames = filtered;
+  if (selectedGameIndex >= filteredGames.length) {
+    selectedGameIndex = Math.max(0, filteredGames.length - 1);
+  }
+
   if (!filtered.length) {
     gameCards.innerHTML = '<p style="text-align:center;opacity:.4;padding:24px 0">Brak gier w tej kategorii</p>';
     return;
   }
   gameCards.innerHTML = '';
   filtered.forEach((g, i) => {
+    const isSelected = i === selectedGameIndex;
     const hs = g.hasScore ? getLocalHS(g.id) : null;
     const card = document.createElement('div');
-    card.className = `game-card ${g.color || 'green'}`;
+    card.className = `game-card ${g.color || 'green'}${isSelected ? ' selected' : ''}`;
     card.style.animationDelay = `${i * 55}ms`;
     const isApp = g.type === 'app';
     card.innerHTML = `
@@ -1063,7 +1073,11 @@ function renderCards() {
         ${hs !== null ? `<div class="card-hs">🏆 Rekord: <b>${hs}</b> ${esc(g.scoreUnit || 'pkt')}</div>` : ''}
         <button class="play-btn">${isApp ? '▶ OTWÓRZ' : '▶ GRAJ'}</button>
       </div>`;
-    card.addEventListener('click', () => openGame(g));
+    card.addEventListener('click', () => {
+      selectedGameIndex = i;
+      renderCards();
+      openGame(g);
+    });
     gameCards.appendChild(card);
   });
 }
@@ -1530,3 +1544,69 @@ if (sensSlider && sensVal) {
 
 // auto-reconnect to last known device
 triki.autoConnect().catch(() => {});
+
+// ── Pętla do obsługi gestów menu w tle (Hub, Nakładka Startowa, Nakładka Końcowa) ──
+function updateMenuGestures() {
+  if (triki.connected) {
+    // 1. Obsługa gdy jesteśmy w Hubie (wybór gier)
+    if (hub.style.display !== 'none') {
+      const rotVal = triki.ROT?.() ?? 0;
+      if (filteredGames && filteredGames.length > 0) {
+        if (!menuRotLatch) {
+          if (rotVal > 25) {
+            selectedGameIndex = (selectedGameIndex + 1) % filteredGames.length;
+            menuRotLatch = true;
+            renderCards();
+            const selectedCard = gameCards.children[selectedGameIndex];
+            if (selectedCard) {
+              selectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+          } else if (rotVal < -25) {
+            selectedGameIndex = (selectedGameIndex + filteredGames.length - 1) % filteredGames.length;
+            menuRotLatch = true;
+            renderCards();
+            const selectedCard = gameCards.children[selectedGameIndex];
+            if (selectedCard) {
+              selectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+          }
+        } else {
+          if (Math.abs(rotVal) < 8) {
+            menuRotLatch = false;
+          }
+        }
+      }
+
+      // Kliknięcie fizycznego przycisku kapsla uruchamia zaznaczoną grę
+      if (triki.consumeClick?.()) {
+        const targetGame = filteredGames[selectedGameIndex];
+        if (targetGame) {
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+          openGame(targetGame);
+        }
+      }
+    }
+
+    // 2. Obsługa gdy jesteśmy na nakładce startowej gry (kliknięcie start)
+    if (gameView.style.display !== 'none' && !ovStart.classList.contains('hidden')) {
+      if (triki.consumeClick?.()) {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+        btnStart.click();
+      }
+    }
+
+    // 3. Obsługa gdy jesteśmy na nakładce końca gry (kliknięcie restart)
+    if (gameView.style.display !== 'none' && !ovEnd.classList.contains('hidden')) {
+      if (triki.consumeClick?.()) {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+        btnRestart.click();
+      }
+    }
+  }
+
+  requestAnimationFrame(updateMenuGestures);
+}
+// Uruchomienie pętli gestów menu
+requestAnimationFrame(updateMenuGestures);
