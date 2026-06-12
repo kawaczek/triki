@@ -103,51 +103,42 @@ export default class RuletkaGame {
     this._t += dt;
     if (!this._running) return;
 
-    const gz  = this.triki.gz;
-    const btn = this.triki.consumeClick?.();
+    const btn = this.triki.connected && this.triki.consumeClick?.();
+    const rotVal = this.triki.connected ? (this.triki.ROT?.() ?? 0) : 0;
 
-    if (this._state === 'idle') {
+    // Wykrywanie potrząsania
+    const g = Math.hypot(this.triki.ax, this.triki.ay, this.triki.az);
+    const isShaking = this.triki.connected && (Math.abs(g - 1.0) > 0.22);
+
+    if (this._state === 'idle' || this._state === 'done') {
+      // 1. Zmiana zestawu opcji przyciskiem kapsla
       if (btn) {
-        this._state   = 'ready';
-        this._stopLow = 0;
-        this._maxVel  = 0;
+        this._setIdx = (this._setIdx + 1) % SETS.length;
+        this._reset();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(40);
+        return;
       }
 
-    } else if (this._state === 'ready') {
-      if (Math.abs(gz) > STOP_GZ) {
-        this._state = 'active';
+      // 2. Kręcenie kołem przez potrząśnięcie lub szybki obrót kapsla
+      if (isShaking) {
+        this._startSettle(0.014 + Math.random() * 0.008);
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(60);
+      } else if (Math.abs(rotVal) > 22) {
+        // Oblicz prędkość początkową na podstawie szybkości obrotu kapsla
+        const initialVel = Math.min(0.025, Math.max(0.008, Math.abs(rotVal) * 0.0003));
+        this._startSettle(initialVel);
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(60);
       }
-      if (btn) { this._reset(); return; }
-
-    } else if (this._state === 'active') {
-      // wheel śledzi gz kapsla w czasie rzeczywistym
-      const v = Math.abs(gz) * GZ_TO_VEL;
-      this._vel = v;
-      if (v > this._maxVel) this._maxVel = v;
-      this._angle += v * dt;
-
-      if (Math.abs(gz) < STOP_GZ) {
-        this._stopLow += dt;
-        if (this._stopLow >= STOP_TIME) {
-          // kapsel zatrzymany → settle z prędkością na podstawie maxVel
-          this._startSettle(this._maxVel * 0.55);
-        }
-      } else {
-        this._stopLow = 0;
-      }
-
     } else if (this._state === 'settling') {
-      // wheel wyhamowuje — SPIN_DEC jest mały więc trwa kilka sekund
+      // Wyhamowywanie koła
       this._vel = Math.max(0, this._vel - SPIN_DEC * dt);
       this._angle += this._vel * dt;
       if (this._vel === 0) {
         this._computeResult();
       }
-
     } else if (this._state === 'done') {
       this._resultAlpha = Math.min(1, this._resultAlpha + dt * 0.003);
       this._flashAlpha  = Math.max(0, this._flashAlpha  - dt * 0.002);
-      if (btn) this._reset();
     }
   }
 
@@ -268,35 +259,28 @@ export default class RuletkaGame {
       ctx.shadowBlur = 0;
       ctx.fillStyle  = 'rgba(255,255,255,0.3)';
       ctx.font       = `${Math.round(W * 0.032)}px Outfit, sans-serif`;
-      ctx.fillText('naciśnij żeby kręcić ponownie', CX, resY + 28);
+      ctx.fillText('zakręć 🔄 lub potrząśnij 🫨 by losować ponownie', CX, resY + 28);
       ctx.globalAlpha = 1;
     }
 
     // Instrukcja / status
-    const infoY = H - 52;
+    const infoY = H - 64;
     ctx.textAlign = 'center';
     if (this._state === 'idle') {
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font      = `bold ${Math.round(W * 0.044)}px Outfit, sans-serif`;
-      ctx.fillText('Naciśnij przycisk kapsla', CX, infoY);
-      ctx.fillStyle = 'rgba(255,255,255,0.22)';
-      ctx.font      = `${Math.round(W * 0.033)}px Outfit, sans-serif`;
-      ctx.fillText('a potem zakręć kapsel', CX, infoY + 22);
-    } else if (this._state === 'ready') {
-      const pulse = 0.65 + 0.35 * Math.sin(this._t * 0.007);
-      ctx.globalAlpha = pulse;
-      ctx.fillStyle   = '#a855f7';
-      ctx.font        = `bold ${Math.round(W * 0.056)}px Outfit, sans-serif`;
-      ctx.fillText('Zakręć kapsel!', CX, infoY);
-      ctx.globalAlpha = 1;
-    } else if (this._state === 'active') {
-      ctx.fillStyle = '#f59e0b';
-      ctx.font      = `bold ${Math.round(W * 0.044)}px Outfit, sans-serif`;
-      ctx.fillText('Kręcę…', CX, infoY);
-    } else if (this._state === 'settling') {
+      ctx.fillStyle = '#fff';
+      ctx.font      = `bold ${Math.round(W * 0.042)}px Outfit, sans-serif`;
+      ctx.fillText('Zakręć 🔄 lub potrząśnij 🫨 kapsel', CX, infoY);
       ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.font      = `${Math.round(W * 0.038)}px Outfit, sans-serif`;
-      ctx.fillText('Wyhamuję…', CX, infoY);
+      ctx.font      = `${Math.round(W * 0.034)}px Outfit, sans-serif`;
+      ctx.fillText('naciśnij przycisk 🔘 aby zmienić zestaw', CX, infoY + 22);
+    } else if (this._state === 'settling') {
+      ctx.fillStyle = '#f59e0b';
+      ctx.font      = `bold ${Math.round(W * 0.046)}px Outfit, sans-serif`;
+      ctx.fillText('Koło się kręci… 🎡', CX, infoY + 10);
+    } else if (this._state === 'done') {
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font      = `${Math.round(W * 0.034)}px Outfit, sans-serif`;
+      ctx.fillText('naciśnij przycisk 🔘 aby zmienić zestaw', CX, infoY + 10);
     }
 
     // Zakładki zestawów

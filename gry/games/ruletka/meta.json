@@ -6,10 +6,9 @@
   "description": "Kręć kołem losu! TAK/NIE i inne. Potrząśnij kapslem żeby zakręcić.",
   "difficulty": "",
   "color": "orange",
+  "scheme": "rotate",
   "controls": {
-    "ble": "Potrząśnij kapslem żeby zakręcić",
-    "mouse": "Kliknij żeby zakręcić",
-    "keys": "Spacja = kręć, strzałki = zmień zestaw"
+    "ble": "Zakręć kapsel 🔄 (obróć go szybko na płaskiej powierzchni) lub potrząśnij 🫨 żeby zakręcić kołem. Kliknij przycisk kapsla 🔘 żeby zmienić zestaw."
   },
   "hasScore": false,
   "skipCalib": true,
