@@ -82,6 +82,14 @@ export default class AtariGame {
     this.initGameState();
   }
 
+  drawRoundRect(ctx, x, y, w, h, r) {
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+  }
+
   initGameState() {
     this.score = 0;
     this.playerX = 0.5; // pozycja [0..1] wewnątrz ekranu TV
@@ -316,7 +324,7 @@ export default class AtariGame {
     ctx.save();
     ctx.fillStyle = '#1e1f29'; // obudowa TV
     ctx.beginPath();
-    ctx.roundRect(tvX - 12, tvY - 12, tvW + 24, tvH + 24, 18);
+    this.drawRoundRect(ctx, tvX - 12, tvY - 12, tvW + 24, tvH + 24, 18);
     ctx.fill();
     
     // drewniane boczki obudowy TV
@@ -337,7 +345,7 @@ export default class AtariGame {
     ctx.save();
     // Clipowanie do wirtualnego ekranu
     ctx.beginPath();
-    ctx.roundRect(tvX, tvY, tvW, tvH, 10);
+    this.drawRoundRect(ctx, tvX, tvY, tvW, tvH, 10);
     ctx.clip();
     
     // Kineskopowy kolor tła (ciemny błękit/szary z poświatą)
