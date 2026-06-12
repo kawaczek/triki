@@ -40,8 +40,7 @@ class TrikiController {
     this._calibNeut = null;    // tymczasowe: neutral podczas kroku 1
     try { const s = localStorage.getItem('triki_calib_v2'); if (s) this._calibV2 = JSON.parse(s); } catch(_) {}
     this._rotDrift  = 0;       // offset gz ustawiany w chwili kalibracji (snapshot)
-    const _ai = localStorage.getItem('triki_auto_invert');
-    this.autoInvert  = _ai === '1';
+    this.autoInvert  = true;
   }
 
   // ── auto-connect do zapamiętanego urządzenia ──────────────
@@ -215,7 +214,7 @@ class TrikiController {
 
   get _ix() {
     let inv = this.invertX;
-    if (this.autoInvert && this.isFlipped) {
+    if (this.isFlipped) {
       inv = !inv;
     }
     return inv ? -1 : 1;
@@ -223,7 +222,7 @@ class TrikiController {
 
   get _iy() {
     let inv = this.invertY;
-    if (this.autoInvert && this.isFlipped) {
+    if (this.isFlipped) {
       inv = !inv;
     }
     return inv ? -1 : 1;
@@ -288,9 +287,7 @@ class TrikiController {
   }
 
   setAutoInvert(on) {
-    this.autoInvert = on;
-    localStorage.setItem('triki_auto_invert', on ? '1' : '0');
-    this._emit();
+    this.autoInvert = true;
   }
 
   _emit() { this.onStatus?.(); }

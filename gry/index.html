@@ -122,7 +122,9 @@
     <h2>Sterowanie kapslem</h2>
     <label class="modal-label">🎯 Czułość: <b id="set-sens-val">100%</b></label>
     <input type="range" id="set-sens" min="20" max="300" value="100" class="set-slider">
-    <label class="set-check" id="lbl-set-autoinv"><input type="checkbox" id="set-autoinv"> <span id="txt-set-autoinv">🤖 Auto-Odwracanie (Flip check)</span></label>
+    <div id="status-set-orientation" style="margin-bottom:12px;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px;font-size:11px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,0.06);">
+      Ułożenie: <span id="txt-set-orientation" style="font-weight:bold;color:#f1f5f9">🤖 Normalne</span>
+    </div>
     <label class="set-check"><input type="checkbox" id="set-invx"> Odwróć oś poziomą ↔️</label>
     <label class="set-check"><input type="checkbox" id="set-invy"> Odwróć oś pionową ↕️</label>
     <button class="btn-outline" id="btn-set-calib" style="width:100%">🎯 Skalibruj osie kapsla</button>
@@ -174,7 +176,7 @@
   </div>
 </div>
 
-<script src="/static/triki.js?v=202606121855"></script>
-<script src="/static/app.js?v=202606121855"></script>
+<script src="/static/triki.js?v=202606121914"></script>
+<script src="/static/app.js?v=202606121914"></script>
 </body>
 </html>

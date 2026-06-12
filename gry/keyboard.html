@@ -106,9 +106,9 @@
 <header>
   <span class="title">⌨️ Triki Klawiatura</span>
   <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
-    <label id="lbl-auto-invert" style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: rgba(255,255,255,0.7); transition: color 0.2s;">
-      <input type="checkbox" id="chk-auto-invert" style="cursor: pointer; accent-color: #22c55e;"> <span id="txt-auto-invert">🤖 Auto-Odwróć</span>
-    </label>
+    <span id="lbl-orientation" style="font-size: 11px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 4px;">
+      Ułożenie: <span id="txt-orientation" style="font-weight:bold;color:#f1f5f9">🤖 Normalne</span>
+    </span>
     <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: rgba(255,255,255,0.7);">
       <input type="checkbox" id="chk-invert-rot" style="cursor: pointer; accent-color: #22c55e;"> 🔄 Odwróć
     </label>
@@ -165,10 +165,6 @@ document.getElementById('btn-ble').onclick = () => triki.connect();
 const chkInvert = document.getElementById('chk-invert-rot');
 chkInvert.checked = triki.invertX;
 chkInvert.onchange = (e) => triki.setInvert('x', e.target.checked);
-
-const chkAutoInvert = document.getElementById('chk-auto-invert');
-chkAutoInvert.checked = triki.autoInvert;
-chkAutoInvert.onchange = (e) => triki.setAutoInvert(e.target.checked);
 
 const rngStep = document.getElementById('rng-step');
 const lblStep = document.getElementById('lbl-step');
@@ -411,7 +407,6 @@ function frame(t) {
     if (wasConn) {
       triki.calibrateNeutral(); // Wyzeruj dryf na starcie
       chkInvert.checked = triki.invertX; // zsynchronizuj stan checkboxa
-      chkAutoInvert.checked = triki.autoInvert; // zsynchronizuj stan auto-invert
       requestWakeLock(); // Nie wygaszaj ekranu
     } else {
       releaseWakeLock(); // Pozwól wygasić ekran po rozłączeniu
@@ -423,15 +418,19 @@ function frame(t) {
     updateHint();
   }
 
-  // Dynamiczny efekt statusu Auto-Odwrócenia
-  const lblAuto = document.getElementById('lbl-auto-invert');
-  const txtAuto = document.getElementById('txt-auto-invert');
-  if (triki.connected && triki.autoInvert && triki.isFlipped) {
-    lblAuto.style.color = '#22c55e';
-    txtAuto.textContent = '🙃 Odwrócony';
-  } else {
-    lblAuto.style.color = 'rgba(255,255,255,0.7)';
-    txtAuto.textContent = '🤖 Auto-Odwróć';
+  // Dynamiczny status ułożenia kapsla
+  const txtOrient = document.getElementById('txt-orientation');
+  if (txtOrient) {
+    if (!triki.connected) {
+      txtOrient.textContent = "Brak połączenia";
+      txtOrient.style.color = "rgba(255,255,255,0.3)";
+    } else if (triki.isFlipped) {
+      txtOrient.textContent = "🙃 Odwrócony";
+      txtOrient.style.color = "#22c55e";
+    } else {
+      txtOrient.textContent = "🤖 Normalne";
+      txtOrient.style.color = "#f1f5f9";
+    }
   }
 
   const rotVal = triki.ROT?.() ?? 0;

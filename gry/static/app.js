@@ -145,10 +145,7 @@ function openSettings() {
   setSensVal.textContent = setSens.value + '%';
   setInvX.checked = triki.invertX;
   setInvY.checked = triki.invertY;
-  const setAutoInv = $('set-autoinv');
-  if (setAutoInv) {
-    setAutoInv.checked = triki.autoInvert;
-  }
+  triki.onStatus(); // Wyzwól aktualizację wskaźnika ułożenia
   setModal.classList.remove('hidden');
 }
 
@@ -166,10 +163,6 @@ setSens.addEventListener('input', () => {
 });
 setInvX.addEventListener('change', () => triki.setInvert('x', setInvX.checked));
 setInvY.addEventListener('change', () => triki.setInvert('y', setInvY.checked));
-const setAutoInv = $('set-autoinv');
-if (setAutoInv) {
-  setAutoInv.addEventListener('change', () => triki.setAutoInvert(setAutoInv.checked));
-}
 $('btn-set-close').addEventListener('click', closeSettings);
 $('btn-set-calib').addEventListener('click', async () => {
   closeSettings();
@@ -880,16 +873,18 @@ triki.onStatus = () => {
   updateBlePanel();
   updateGameBleCh();
   
-  // Zaktualizuj wizualny stan Auto-Odwrócenia w modalu ustawień
-  const lblSetAuto = $('lbl-set-autoinv');
-  const txtSetAuto = $('txt-set-autoinv');
-  if (lblSetAuto && txtSetAuto) {
-    if (triki.connected && triki.autoInvert && triki.isFlipped) {
-      lblSetAuto.style.color = '#22c55e';
-      txtSetAuto.textContent = '🙃 Odwrócony';
+  // Zaktualizuj wizualny stan ułożenia w modalu ustawień
+  const txtSetOrient = $('txt-set-orientation');
+  if (txtSetOrient) {
+    if (!triki.connected) {
+      txtSetOrient.textContent = "Brak połączenia";
+      txtSetOrient.style.color = "rgba(255,255,255,0.3)";
+    } else if (triki.isFlipped) {
+      txtSetOrient.textContent = "🙃 Odwrócony";
+      txtSetOrient.style.color = "#22c55e";
     } else {
-      lblSetAuto.style.color = '';
-      txtSetAuto.textContent = '🤖 Auto-Odwracanie (Flip check)';
+      txtSetOrient.textContent = "🤖 Normalne";
+      txtSetOrient.style.color = "#f1f5f9";
     }
   }
 
