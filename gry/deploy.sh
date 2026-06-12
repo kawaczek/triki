@@ -57,6 +57,8 @@ chmod 644 keyboard.html
 chmod 644 diag.php
 chmod 644 api.php
 chmod 644 .htaccess
+chmod 644 robots.txt
+chmod 644 sitemap.xml
 chmod 644 static/triki.js
 chmod 644 static/app.js
 chmod 644 static/style.css
