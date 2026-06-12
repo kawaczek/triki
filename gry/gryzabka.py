@@ -99,7 +99,11 @@ class Handler(SimpleHTTPRequestHandler):
             players = json.loads(f.read_text('utf-8')) if f.exists() else {}
             did = body.get('device_id')
             if did:
-                body.setdefault('last_seen', datetime.datetime.utcnow().isoformat() + 'Z')
+                now = datetime.datetime.utcnow().isoformat() + 'Z'
+                body.setdefault('last_seen', now)
+                # nowy gracz → ustaw datę rejestracji; istniejący → zachowaj starą
+                existing = players.get(did, {})
+                body.setdefault('created', existing.get('created', now))
                 players[did] = {k: v for k, v in body.items() if k != 'device_id'}
                 f.write_text(json.dumps(players, indent=2, ensure_ascii=False), 'utf-8')
             self._ok({'ok': True})
