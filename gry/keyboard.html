@@ -140,6 +140,7 @@ let text = '', mode = 'wheel';
 let wAngle = 0, wFlash = 0;
 let gRow = 0, gCol = 0, gFlash = 0, navT = 0;
 let pressQueued = false;
+let cumulativeAngle = 0; // Zintegrowany kąt obrotu w stopniach
 
 // ── Triki ─────────────────────────────────────────────────────────────────────
 const triki = new TrikiController();
@@ -208,6 +209,8 @@ document.querySelectorAll('.tab').forEach(b => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
     b.classList.add('on');
     triki.scheme = mode === 'wheel' ? 'rotate' : 'tilt';
+    cumulativeAngle = 0;
+    wAngle = 0;
     updateHint();
   };
 });
@@ -348,17 +351,28 @@ function frame(t) {
     const btn = document.getElementById('btn-ble');
     btn.textContent = wasConn ? '✅ ' + (triki.name ?? 'Kapsel') : '🔌 Połącz BLE';
     btn.className   = wasConn ? 'ok' : '';
+    if (wasConn) {
+      triki.calibrateNeutral(); // Wyzeruj dryf na starcie
+    }
+    cumulativeAngle = 0;
+    wAngle = 0;
     updateHint();
   }
 
+  const rotVal = triki.ROT?.() ?? 0;
   const gz  = triki.GZ?.() ?? 0;
   const gx  = triki.GX?.() ?? 0;
   const btn = triki.consumeClick?.() ?? false;
   const hit = btn || pressQueued; pressQueued = false;
 
   if (mode === 'wheel') {
-    const gzDead = Math.abs(gz) < 0.18 ? 0 : gz - Math.sign(gz) * 0.18;
-    wAngle -= gzDead * dt * 0.9;
+    // gz z kompensacją dryfu (rotVal) w stopniach na sekundę
+    cumulativeAngle += rotVal * dt;
+    
+    // 10 stopni fizycznego obrotu = 1 krok wyboru znaku
+    const stepRad = (2 * Math.PI) / WK.length;
+    wAngle = - (cumulativeAngle / 10) * stepRad;
+
     if (hit) { typeKey(WK[wIdx()]); wFlash = 0.22; }
     if (wFlash > 0) wFlash -= dt;
     drawWheel();
