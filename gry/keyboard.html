@@ -105,9 +105,12 @@
 
 <header>
   <span class="title">⌨️ Triki Klawiatura</span>
-  <div style="display: flex; align-items: center; gap: 12px;">
-    <label style="font-size: 12px; display: flex; align-items: center; gap: 5px; cursor: pointer; color: rgba(255,255,255,0.7);">
-      <input type="checkbox" id="chk-invert-rot" style="cursor: pointer; accent-color: #22c55e;"> 🔄 Odwróć (Rewers)
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: rgba(255,255,255,0.7);">
+      <input type="checkbox" id="chk-invert-rot" style="cursor: pointer; accent-color: #22c55e;"> 🔄 Odwróć
+    </label>
+    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.7);">
+      ⚙️ Skok: <input type="range" id="rng-step" min="5" max="45" step="1" style="width: 60px; cursor: pointer; accent-color: #22c55e;"> <span id="lbl-step">15°</span>
     </label>
     <button id="btn-ble">🔌 Połącz BLE</button>
   </div>
@@ -146,6 +149,8 @@ let wAngle = 0, wFlash = 0;
 let gRow = 0, gCol = 0, gFlash = 0, navT = 0;
 let pressQueued = false;
 let cumulativeAngle = 0; // Zintegrowany kąt obrotu w stopniach
+let axisActiveX = false; // Zatrzask joysticka dla osi pionowej
+let axisActiveY = false; // Zatrzask joysticka dla osi poziomej
 
 // ── Triki ─────────────────────────────────────────────────────────────────────
 const triki = new TrikiController();
@@ -156,6 +161,17 @@ document.getElementById('btn-ble').onclick = () => triki.connect();
 const chkInvert = document.getElementById('chk-invert-rot');
 chkInvert.checked = triki.invertX;
 chkInvert.onchange = (e) => triki.setInvert('x', e.target.checked);
+
+const rngStep = document.getElementById('rng-step');
+const lblStep = document.getElementById('lbl-step');
+let stepDegrees = parseInt(localStorage.getItem('triki_kb_wheel_step') || '15');
+rngStep.value = stepDegrees;
+lblStep.textContent = stepDegrees + '°';
+rngStep.oninput = (e) => {
+  stepDegrees = parseInt(e.target.value);
+  lblStep.textContent = stepDegrees + '°';
+  localStorage.setItem('triki_kb_wheel_step', stepDegrees);
+};
 
 // ── Canvas ────────────────────────────────────────────────────────────────────
 const canvas = document.getElementById('kb-canvas');
@@ -220,6 +236,8 @@ document.querySelectorAll('.tab').forEach(b => {
     triki.scheme = mode === 'wheel' ? 'rotate' : 'tilt';
     cumulativeAngle = 0;
     wAngle = 0;
+    axisActiveX = false;
+    axisActiveY = false;
     updateHint();
   };
 });
@@ -366,6 +384,8 @@ function frame(t) {
     }
     cumulativeAngle = 0;
     wAngle = 0;
+    axisActiveX = false;
+    axisActiveY = false;
     updateHint();
   }
 
@@ -382,23 +402,48 @@ function frame(t) {
     const gzFiltered = Math.abs(correctedGz) < 2.5 ? 0 : correctedGz;
     cumulativeAngle += gzFiltered * dt;
     
-    // 15 stopni fizycznego obrotu = 1 krok wyboru znaku (3x stabilniej!)
+    // Konfigurowalny fizyczny obrót (stepDegrees) = 1 krok wyboru znaku
     const stepRad = (2 * Math.PI) / WK.length;
-    wAngle = - (cumulativeAngle / 15) * stepRad;
+    wAngle = - (cumulativeAngle / stepDegrees) * stepRad;
 
     if (hit) { typeKey(WK[wIdx()]); wFlash = 0.22; }
     if (wFlash > 0) wFlash -= dt;
     drawWheel();
   } else {
-    navT -= dt;
-    if (navT <= 0) {
-      const TH = 0.12; let mv = false;
-      if      (gz >  TH) { gCol = Math.min(GC-1, gCol+1); mv = true; }
-      else if (gz < -TH) { gCol = Math.max(0,     gCol-1); mv = true; }
-      if      (gx >  TH) { gRow = Math.min(GR-1, gRow+1); mv = true; }
-      else if (gx < -TH) { gRow = Math.max(0,     gRow-1); mv = true; }
-      if (mv) navT = 0.18;
+    // Tryb Siatki (Dyskretny joystick krokowy z zatrzaskiem powrotu do zera)
+    const TH = 0.16;       // Próg wychylenia do wykonania kroku
+    const TH_RESET = 0.07; // Próg powrotu do pozycji neutralnej (uzbrojenie)
+
+    // Oś pozioma (GZ)
+    if (!axisActiveY) {
+      if (gz > TH) {
+        gCol = Math.min(GC - 1, gCol + 1);
+        axisActiveY = true;
+      } else if (gz < -TH) {
+        gCol = Math.max(0, gCol - 1);
+        axisActiveY = true;
+      }
+    } else {
+      if (Math.abs(gz) < TH_RESET) {
+        axisActiveY = false;
+      }
     }
+
+    // Oś pionowa (GX)
+    if (!axisActiveX) {
+      if (gx > TH) {
+        gRow = Math.min(GR - 1, gRow + 1);
+        axisActiveX = true;
+      } else if (gx < -TH) {
+        gRow = Math.max(0, gRow - 1);
+        axisActiveX = true;
+      }
+    } else {
+      if (Math.abs(gx) < TH_RESET) {
+        axisActiveX = false;
+      }
+    }
+
     if (hit) { typeKey(GK[gRow][gCol]); gFlash = 0.22; }
     if (gFlash > 0) gFlash -= dt;
     drawGrid();
