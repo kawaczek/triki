@@ -1610,3 +1610,29 @@ function updateMenuGestures() {
 }
 // Uruchomienie pętli gestów menu
 requestAnimationFrame(updateMenuGestures);
+
+// ── Wykrywanie komputera (desktop) i pokazywanie kodu QR ──
+function initDesktopPopup() {
+  const isDesktop = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && window.innerWidth >= 1024;
+  
+  if (isDesktop) {
+    const popup = $('desktop-popup');
+    const qrImg = $('desktop-qr');
+    const btnClose = $('btn-close-desktop');
+    
+    if (popup && qrImg && btnClose) {
+      const pageUrl = window.location.href;
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pageUrl)}`;
+      
+      // Pokaż popup
+      popup.classList.remove('hidden');
+      
+      // Przycisk zamknięcia
+      btnClose.onclick = () => {
+        popup.classList.add('hidden');
+      };
+    }
+  }
+}
+// Wywołanie detekcji desktopu przy starcie
+initDesktopPopup();
