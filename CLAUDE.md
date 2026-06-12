@@ -38,9 +38,20 @@ python3 gry/gryzabka.py 8888     # custom port
 
 **Deploy to production (gry.kawak.pl):**
 ```bash
-cd ~/projekty/zabka && rsync -avz --exclude='data/' --exclude='__pycache__/' --exclude='*.log' gry/ malina:/home/kawak/gry/
+cd ~/projekty/zabka/gry
+lftp -u "$FTP_GRY_USER,$FTP_GRY_PASS" ftp.dm72001.domenomania.eu << 'EOF'
+set ssl:verify-certificate no
+mirror -R --parallel=4 --exclude-glob=data/ --exclude-glob=__pycache__/ --exclude-glob=*.log --exclude-glob=gryzabka.py . /
+put .htaccess -o /.htaccess
+quit
+EOF
 ```
-`data/` exclusion is mandatory (player scores/profiles live there). No server restart needed for HTML/JS/CSS changes.
+- Hosting: `ftp.dm72001.domenomania.eu`, IP `185.17.43.225`, LiteSpeed + PHP, cPanel (Domenomania)
+- API: `api.php` (PHP port of gryzabka.py) — gryzabka.py NIE jest już używany na malinie
+- `data/` exclusion mandatory — player scores/profiles live there
+- After upload: fix permissions — new files land as 600/700, server needs 644/755
+- `.htaccess` never uploaded by mirror (hidden file) — always `put .htaccess` separately
+- Cloudflare SSL: Flexible mode (hosting has no SSL cert)
 
 ### Architecture
 
@@ -50,7 +61,7 @@ cd ~/projekty/zabka && rsync -avz --exclude='data/' --exclude='__pycache__/' --e
 - `static/gameutils.js` — shared ES module for games (clamp, rand, pick, lerp, drawGrid, radialGlow, drawHintBubble)
 - `games/<id>/` — one directory per game (`meta.json` + `game.js` ES module); `_`-prefixed dirs ignored
 
-**8 games:** catch, snake, frog, maze, pong (Arkanoid), shooter, crawler (Dungeon — floor 1 tutorial with hint bubbles), **kulka** (marble labyrinth — pure accelerometer tilt, 60s timer, collect 3 stars).
+**9 games:** catch, snake, frog, maze, pong (Arkanoid), shooter, crawler (Dungeon — floor 1 tutorial with hint bubbles), kulka (marble labyrinth — pure accelerometer tilt, 60s timer, collect 3 stars), **lotki** (Darts — tilt to aim, g-force spike to throw, standard dartboard scoring).
 
 **Sensor axis map** (confirmed by `/api/diag` wizard):
 - `ax` → tilt right/left (+right, −left)
