@@ -645,6 +645,14 @@ class _DashboardPageState extends State<DashboardPage>
     if (_btnOrientation == ButtonOrientation.front) { iGx = gy; iGz = -gx; iAx = ay; iAy = -ax; }
     else if (_btnOrientation == ButtonOrientation.right) { iGx = -gx; iGz = -gz; iAx = -ax; iAy = -ay; }
 
+    // Automatyczna korekcja kierunków jeśli kapsel jest odwrócony (rewersem do góry)
+    if (az < -0.2) {
+      iGx = -iGx;
+      iGz = -iGz;
+      iAx = -iAx;
+      iAy = -iAy;
+    }
+
     if (_controllerMode == ControllerMode.mouse) {
       // ── TRYB MYSZKI (Domyślne sterowanie kursorem) ───────────────────
       // Scroll mode (button held + tilt)
