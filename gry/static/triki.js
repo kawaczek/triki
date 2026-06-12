@@ -162,7 +162,12 @@ class TrikiController {
     this.gz = dv.getInt16(6, true) * GYRO_S;
     this.ax = dv.getInt16(8,  true) * ACCEL_S;
     this.ay = dv.getInt16(10, true) * ACCEL_S;
+    
+    const oldFlipped = this.isFlipped;
     this.az = dv.getInt16(12, true) * ACCEL_S;
+    if (this.isFlipped !== oldFlipped) {
+      this._emit();
+    }
   }
 
   consumeClick() { const v = this._btnEdge; this._btnEdge = false; return v; }
