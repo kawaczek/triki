@@ -36,12 +36,16 @@ export default class LosowaczkaGame {
     this._running = false;
     this._hint    = 1;
 
+    this._lastShakeTime = 0;
+    this._buttonRoll = false;
+    this._rotLatch = false;
+
     // historia rzutów monetą
     this._coinHist  = [];   // tablica 0/1 (0=orzeł, 1=reszka)
     this._coinCount = [0, 0]; // [orzeł, reszka]
   }
 
-  start()  { this._running = true; this._result = null; this._hint = 1; }
+  start()  { this._running = true; this._result = null; this._hint = 1; this._rolling = false; }
   stop()   { this._running = false; }
   resize() {}
 
@@ -49,46 +53,103 @@ export default class LosowaczkaGame {
     return MODES[this._mode] === 'coin' ? DEBOUNCE_COIN : DEBOUNCE_REST;
   }
 
-  _roll() {
-    if (this._rolling) return;
-    this._rolling = true;
-    this._rollT   = 0;
-    this._hint    = 0;
+  _rollTemp() {
+    const m = MODES[this._mode];
+    if (m === 'dice') {
+      this._result = { type: 'dice', val: Math.floor(Math.random() * 6) };
+    } else if (m === 'coin') {
+      this._result = { type: 'coin', val: Math.floor(Math.random() * 2) };
+    } else {
+      this._result = { type: 'ball', val: Math.floor(Math.random() * BALL_ANSWERS.length) };
+    }
+  }
+
+  _finalizeRoll() {
     const m = MODES[this._mode];
     if (m === 'dice') {
       this._result = { type: 'dice', val: Math.floor(Math.random() * 6) };
     } else if (m === 'coin') {
       const v = Math.floor(Math.random() * 2);
       this._result = { type: 'coin', val: v };
-      // dopisz do historii
       this._coinHist.push(v);
       if (this._coinHist.length > COIN_MAX_HIST) this._coinHist.shift();
       this._coinCount[v]++;
     } else {
       this._result = { type: 'ball', val: Math.floor(Math.random() * BALL_ANSWERS.length) };
     }
+    this._buttonRoll = false;
   }
 
   update(dt) {
     this._t += dt;
     if (!this._running) return;
 
+    // 1. Przełączanie trybów za pomocą kliknięcia przycisku kapsla
+    if (this.triki.connected && this.triki.consumeClick?.()) {
+      this._mode = (this._mode + 1) % MODES.length;
+      this._result = null;
+      this._rolling = false;
+      this._rollT = 0;
+      this._hint = 0;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(40);
+      }
+    }
+
+    // 2. Przełączanie trybów za pomocą obrotu kapsla (ROT)
+    if (this.triki.connected) {
+      const rotVal = this.triki.ROT?.() ?? 0;
+      if (!this._rotLatch) {
+        if (rotVal > 25) {
+          this._mode = (this._mode + 1) % MODES.length;
+          this._result = null;
+          this._rolling = false;
+          this._rotLatch = true;
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(40);
+        } else if (rotVal < -25) {
+          this._mode = (this._mode + MODES.length - 1) % MODES.length;
+          this._result = null;
+          this._rolling = false;
+          this._rotLatch = true;
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(40);
+        }
+      } else {
+        if (Math.abs(rotVal) < 8) {
+          this._rotLatch = false;
+        }
+      }
+    }
+
+    // 3. Wykrywanie potrząsania fizycznego
+    const g = Math.hypot(this.triki.ax, this.triki.ay, this.triki.az);
+    // Próg potrząsania ustawiony na 0.22, aby łatwo utrzymać ciągłość ruchu
+    const isShaking = this.triki.connected && (Math.abs(g - 1.0) > 0.22);
+
+    if (isShaking) {
+      this._rolling = true;
+      this._lastShakeTime = this._t;
+      this._rollT = 0; // resetujemy czas wygaszania (pełna amplituda)
+      this._hint = 0;
+      this._rollTemp();
+    }
+
+    // 4. Aktualizacja trwającego rzutu (wygaszanie po zaprzestaniu potrząsania)
     if (this._rolling) {
-      this._rollT += dt;
-      if (this._rollT >= ROLL_MS) this._rolling = false;
-    }
+      const timeSinceLastShake = this._t - this._lastShakeTime;
 
-    const deb = this._debounce();
-    const g   = Math.hypot(this.triki.ax, this.triki.ay, this.triki.az);
-    if (g >= SHAKE_G && this._prevG < SHAKE_G && this._t - this._lastT > deb) {
-      this._lastT = this._t;
-      this._roll();
-    }
-    this._prevG = g;
-
-    if (this.triki.consumeClick?.() && this._t - this._lastT > deb) {
-      this._lastT = this._t;
-      this._roll();
+      if (timeSinceLastShake >= 500) {
+        // Kapsel się uspokoił! Finalizujemy rzut.
+        this._rolling = false;
+        this._finalizeRoll();
+      } else {
+        // Wciąż w fazie potrząsania lub wygaszania:
+        if (!isShaking) {
+          this._rollT += dt;
+        } else {
+          this._rollT = 0;
+        }
+        this._rollTemp();
+      }
     }
   }
 
@@ -112,6 +173,12 @@ export default class LosowaczkaGame {
       ctx.fillText(MODE_LABELS[m], i * tabW + tabW / 2, 32);
     });
 
+    // Podpowiedź o obracaniu trybów
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.font = `${Math.round(W * 0.03)}px Outfit, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('kliknij przycisk 🔘 lub obróć 🔄 by zmienić tryb', CX, 64);
+
     if (MODES[this._mode] === 'coin') {
       this._drawCoin(ctx, W, H, CX, CY);
     } else {
@@ -124,7 +191,7 @@ export default class LosowaczkaGame {
       ctx.fillStyle = '#fff';
       ctx.font = `${Math.round(W * 0.038)}px Outfit, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText('potrząśnij lub kliknij', CX, H - 28);
+      ctx.fillText('potrząśnij kapslem żeby rzucić', CX, H - 28);
       ctx.globalAlpha = 1;
     }
   }

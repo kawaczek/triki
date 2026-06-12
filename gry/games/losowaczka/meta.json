@@ -6,10 +6,9 @@
   "description": "Potrząśnij kapslem żeby losować! Kość, moneta lub Magic 8-ball.",
   "difficulty": "",
   "color": "blue",
+  "scheme": "rotate",
   "controls": {
-    "ble": "Potrząśnij kapslem żeby losować",
-    "mouse": "Kliknij żeby losować",
-    "keys": "Spacja = losuj, strzałki = zmień tryb"
+    "ble": "Potrząśnij kapslem żeby losować. Kliknij przycisk 🔘 lub obróć kapsel 🔄 by zmienić tryb."
   },
   "hasScore": false,
   "skipCalib": true,
