@@ -53,6 +53,8 @@ GAME_DIRS=$(ls -d games/*/ 2>/dev/null | sed 's|/$||' | while read d; do echo "$
 lftp -u "$FTP_GRY_USER,$FTP_GRY_PASS" "$FTP_HOST" << EOF
 set ssl:verify-certificate no
 chmod 644 index.html
+chmod 644 keyboard.html
+chmod 644 diag.php
 chmod 644 api.php
 chmod 644 .htaccess
 chmod 644 static/triki.js
