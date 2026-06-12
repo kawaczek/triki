@@ -5,10 +5,9 @@
   "description": "Zostań milionerem w żulowym stylu! 4 odpowiedzi, koło losowe, łapówki.",
   "difficulty": "Trudna",
   "color": "amber",
+  "scheme": "rotate",
   "controls": {
-    "ble": "Przechyl = zaznacz odpowiedź · Kliknij = zatwierdź · Potrząśnij = zakręć kołem",
-    "mouse": "Kliknij odpowiedź · Lifeline'y na dole",
-    "keys": "← → = zaznacz · Enter = zatwierdź · 1/2/3 = lifeline"
+    "ble": "Obróć kapsel 🔄 aby wybrać odpowiedź. Kliknij przycisk 🔘 żeby zatwierdzić. Potrząśnij 🫨 lub szybko obróć aby zakręcić kołem losowym."
   },
   "hasScore": true,
   "scoreUnit": "zł",
