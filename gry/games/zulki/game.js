@@ -73,6 +73,7 @@ export default class ZulkiGame {
     this._comment = "";
     this._commentT = 0;
     this._t = 0;
+    this._rotLatch = false;
     this._ansT = 0;  // timer po wybraniu odpowiedzi
     this._ansState = ""; // "correct"|"wrong"|""
     this._phoneText = "";
@@ -225,7 +226,16 @@ export default class ZulkiGame {
     // Koło
     if (this._state === "wheel" && !this._wheelDone) {
       const gz = this.triki.connected ? Math.abs(this.triki.gz) : 0;
-      const spin = gz * Math.PI / 180 / 1000 * 3;
+      let spin = gz * Math.PI / 180 / 1000 * 3;
+
+      // Dodatkowe zakręcenie kołem przez potrząśnięcie kapslem
+      const g = Math.hypot(this.triki.ax, this.triki.ay, this.triki.az);
+      const isShaking = this.triki.connected && (Math.abs(g - 1.0) > 0.22);
+      if (isShaking) {
+        spin = 0.015 + Math.random() * 0.012;
+        if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(60);
+      }
+
       if (spin > this._wheelVel) this._wheelVel = spin;
       this._wheelVel *= 0.998;
       this._wheelAngle += this._wheelVel * dt;
@@ -254,31 +264,50 @@ export default class ZulkiGame {
       return;
     }
 
-    // Tilt w układzie 2×2: gz=lewo/prawo (kolumna), ax=góra/dół (rząd)
-    // A=0(lewo,góra) B=1(prawo,góra) C=2(lewo,dół) D=3(prawo,dół)
-    const gz = this.triki.connected ? this.triki.gz : this._kDir * 100;
-    const ax = this.triki.connected ? this.triki.ax : this._kDirY * 100;
-    if (Math.abs(gz) > 40 || Math.abs(ax) > 0.35) {
-      this._tiltT += dt;
-      if (this._tiltT > 350) {
-        this._tiltT = 0;
-        const col = this._selected % 2;   // 0=lewo, 1=prawo
-        const row = Math.floor(this._selected / 2); // 0=góra, 1=dół
-        let newCol = col, newRow = row;
-        if (Math.abs(gz) >= Math.abs(ax * 100)) {
-          newCol = gz > 0 ? Math.min(1, col + 1) : Math.max(0, col - 1);
-        } else {
-          newRow = ax > 0 ? Math.min(1, row + 1) : Math.max(0, row - 1);
+    // Wybór odpowiedzi za pomocą obracania kapsla (ROT) w lewo/prawo
+    if (this.triki.connected) {
+      const rotVal = this.triki.ROT?.() ?? 0;
+      if (!this._rotLatch) {
+        if (rotVal > 25) {
+          // Następna odpowiedź
+          let next = (this._selected + 1) % 4;
+          while (this._eliminated.includes(next)) {
+            next = (next + 1) % 4;
+          }
+          this._selected = next;
+          this._rotLatch = true;
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
+        } else if (rotVal < -25) {
+          // Poprzednia odpowiedź
+          let next = (this._selected + 3) % 4;
+          while (this._eliminated.includes(next)) {
+            next = (next + 3) % 4;
+          }
+          this._selected = next;
+          this._rotLatch = true;
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
         }
-        let next = newRow * 2 + newCol;
-        // Pomiń wyeliminowane
-        if (this._eliminated.includes(next)) {
-          next = [0,1,2,3].find(n => !this._eliminated.includes(n)) ?? this._selected;
+      } else {
+        if (Math.abs(rotVal) < 8) {
+          this._rotLatch = false;
         }
-        this._selected = next;
       }
     } else {
-      this._tiltT = 0;
+      // Sterowanie awaryjne klawiaturą w edytorze/symulatorze
+      const gz = this._kDir * 100;
+      if (Math.abs(gz) > 40) {
+        this._tiltT += dt;
+        if (this._tiltT > 300) {
+          this._tiltT = 0;
+          let next = gz > 0 ? (this._selected + 1) % 4 : (this._selected + 3) % 4;
+          while (this._eliminated.includes(next)) {
+            next = gz > 0 ? (next + 1) % 4 : (next + 3) % 4;
+          }
+          this._selected = next;
+        }
+      } else {
+        this._tiltT = 0;
+      }
     }
 
     // BLE button = zatwierdź (TYLKO guzik)

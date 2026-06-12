@@ -1194,9 +1194,6 @@ function showStartOverlay(meta) {
       }
       return;
     }
-    if (!current?.meta?.skipCalib) {
-      await startCalib();
-    }
     ovStart.classList.add('hidden');
     startGame();
   };

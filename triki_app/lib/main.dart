@@ -285,6 +285,7 @@ class _DashboardPageState extends State<DashboardPage>
       Permission.bluetooth,
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
       Permission.notification,
     ].request();
 
