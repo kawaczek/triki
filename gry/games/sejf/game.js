@@ -193,30 +193,9 @@ export default class SejfGame {
     }
   }
   
-  onMouseMove(nx, ny) {
-    if (this.triki.connected || !this.running || this.showVictory) return;
-    // Ruch myszki w poziomie obraca tarczę
-    const diffX = nx - this._mx;
-    this.dialAngle += diffX * 180; // czułość obrotu myszką
-    this._mx = nx;
-    this._my = ny;
-  }
-  
-  onClick(nx, ny) {
-    if (!this.running || this.showVictory) return;
-    this.confirmPosition();
-  }
-  
-  onKeyDown(code) {
-    if (!this.running || this.showVictory) return;
-    if (code === 'ArrowRight') {
-      this.dialAngle += 3.6; // Obrót o 1 pozycję
-    } else if (code === 'ArrowLeft') {
-      this.dialAngle -= 3.6;
-    } else if (code === 'Enter' || code === 'Space') {
-      this.confirmPosition();
-    }
-  }
+  onMouseMove(nx, ny) {}
+  onClick(nx, ny) {}
+  onKeyDown(code) {}
   
   update(dt) {
     if (!this.running) return;

@@ -6,8 +6,8 @@
   "color": "green",
   "controls": {
     "ble": "Obracaj kapslem by kręcić tarczą. Klikaj guzik by zatwierdzić zapadkę.",
-    "mouse": "Ruch lewo/prawo obraca tarczę. Kliknięcie zatwierdza zapadkę.",
-    "keys": "Strzałki Lewo/Prawo obracają tarczę. Enter zatwierdza zapadkę."
+    "mouse": null,
+    "keys": null
   },
   "hasScore": true,
   "scoreUnit": "pkt",
