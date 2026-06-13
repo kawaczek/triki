@@ -138,6 +138,15 @@ class MainActivity : FlutterActivity() {
                         result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
                     }
                 }
+                "cameraShutter" -> {
+                    val service = TrikiAccessibilityService.instance
+                    if (service != null) {
+                        service.performCameraShutter()
+                        result.success(true)
+                    } else {
+                        result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                    }
+                }
                 "keepScreenOn" -> {
                     val keep = call.argument<Boolean>("keep") ?: false
                     if (keep) {

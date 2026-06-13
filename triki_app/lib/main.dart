@@ -14,7 +14,7 @@ import 'games_page.dart';
 
 enum MouseMode { air, table }
 enum ButtonOrientation { left, front, right }
-enum ControllerMode { mouse, media, social }
+enum ControllerMode { mouse, media, social, camera }
 
 class DeviceProfile {
   final String id;
@@ -192,8 +192,6 @@ class _DashboardPageState extends State<DashboardPage>
   MouseMode         _mouseMode   = MouseMode.air;
   ButtonOrientation _btnOrientation = ButtonOrientation.left;
   ControllerMode    _controllerMode = ControllerMode.mouse;
-  DateTime?         _lastShakeTime;
-  int               _shakeCount = 0;
   int               _lastVolTime = 0;
   bool              _trackLatch = false;
   bool              _swipeLatch = false;
@@ -204,11 +202,15 @@ class _DashboardPageState extends State<DashboardPage>
   bool _invertY          = false;
   bool _enableDoubleClick = false;
   double _accelTapThreshold = 0.9;
-  double _airDeadzoneInner = 2.0;
+  double _airDeadzoneInner = 3.5;
   double _airDeadzoneOuter = 6.0;
 
-  // ── Calibration offsets ──────────────────────────────────
+  // ── Calibration offsets (persisted) ─────────────────────
   double _offX = 0, _offY = 0, _offZ = 0, _accOffX = 0, _accOffY = 0;
+
+  // ── Session offsets (auto-zeroed on each button press, not persisted) ───
+  double _sessionOffX = 0, _sessionOffY = 0, _sessionOffZ = 0;
+  double _sessionOffAX = 0, _sessionOffAY = 0;
 
   // ── Telemetry ────────────────────────────────────────────
   double _gx = 0, _gy = 0, _gz = 0;
@@ -225,7 +227,9 @@ class _DashboardPageState extends State<DashboardPage>
   bool     _btnPressed      = false;
   DateTime _btnPressTime    = DateTime.now();
   int      _clickCount      = 0;      // for double-click detection
+  int      _pressCount      = 0;      // for triple-click mode switch
   DateTime _lastClickTime   = DateTime.now();
+  DateTime _lastPressTime   = DateTime(2000);
   double   _lastAccelZ      = 0;
   bool     _scrollTriggered = false;
 
@@ -588,11 +592,11 @@ class _DashboardPageState extends State<DashboardPage>
     _receivedFrames++; _fpsCounter++;
 
     final btnState = f[1];
-    double gx = _i16(f, 2) / 131.0 - _offX;
-    double gy = _i16(f, 4) / 131.0 - _offY;
-    double gz = _i16(f, 6) / 131.0 - _offZ;
-    double ax = _i16(f, 8) / 2048.0 - _accOffX;
-    double ay = _i16(f, 10) / 2048.0 - _accOffY;
+    double gx = _i16(f, 2) / 131.0 - _offX - _sessionOffX;
+    double gy = _i16(f, 4) / 131.0 - _offY - _sessionOffY;
+    double gz = _i16(f, 6) / 131.0 - _offZ - _sessionOffZ;
+    double ax = _i16(f, 8) / 2048.0 - _accOffX - _sessionOffAX;
+    double ay = _i16(f, 10) / 2048.0 - _accOffY - _sessionOffAY;
     double az = _i16(f, 12) / 2048.0;
 
     // ── Button gestures ──────────────────────────────────
@@ -602,22 +606,33 @@ class _DashboardPageState extends State<DashboardPage>
         _btnPressed = true;
         _btnPressTime = DateTime.now();
         _scrollTriggered = false;
+        _quickZero(); // auto-zero position on each press
       } else if (!pressed && _btnPressed) {
         _btnPressed = false;
         final held = DateTime.now().difference(_btnPressTime).inMilliseconds;
         if (!_scrollTriggered) {
           if (held >= 550) {
-            // Long press → right click
             _triggerRightClick();
+            _pressCount = 0;
           } else {
-            // Short press → detect double click with hardware bouncing filter
             final now = DateTime.now();
             final sinceLastClick = now.difference(_lastClickTime).inMilliseconds;
-            if (sinceLastClick < 180) {
-              // Bouncing / szum BLE - ignorujemy to kliknięcie całkowicie
-              return;
+            if (sinceLastClick < 180) return; // BLE debounce
+
+            // Triple-click → cycle mode
+            final sinceLast = now.difference(_lastPressTime).inMilliseconds;
+            if (sinceLast < 600) {
+              _pressCount++;
+            } else {
+              _pressCount = 1;
             }
-            if (!_enableDoubleClick) {
+            _lastPressTime = now;
+            _lastClickTime = now;
+
+            if (_pressCount >= 3) {
+              _cycleMode();
+              _pressCount = 0;
+            } else if (!_enableDoubleClick) {
               _triggerClick();
             } else {
               if (sinceLastClick < 400) {
@@ -628,13 +643,11 @@ class _DashboardPageState extends State<DashboardPage>
                 }
               } else {
                 _clickCount = 1;
-                // Delay single-click to allow double-click window
                 Future.delayed(const Duration(milliseconds: 400), () {
                   if (_clickCount == 1) { _triggerClick(); _clickCount = 0; }
                 });
               }
             }
-            _lastClickTime = now;
           }
         }
       }
@@ -657,9 +670,6 @@ class _DashboardPageState extends State<DashboardPage>
 
     // Feed shared sensor stream for mini-games
     sensorStream.value = TrikiSensorData(gx: gx, gy: gy, gz: gz, ax: ax, ay: ay, az: az);
-
-    // Wykrywanie wstrząsów (Shake Detection) do zmiany trybu
-    _detectShake(ax, ay, az);
 
     if (!_mouseEnabled || !_serviceRunning || _activeProfile == null) return;
     if (gameActive.value) return; // pause mouse when game running
@@ -800,6 +810,8 @@ class _DashboardPageState extends State<DashboardPage>
       _ch.invokeMethod('mediaPlayPause');
     } else if (_controllerMode == ControllerMode.social) {
       _ch.invokeMethod('socialDoubleTap');
+    } else if (_controllerMode == ControllerMode.camera) {
+      _ch.invokeMethod('cameraShutter');
     }
   }
 
@@ -818,23 +830,14 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
-  void _detectShake(double ax, double ay, double az) {
-    double force = sqrt(ax * ax + ay * ay + az * az);
-    if (force > 2.3) {
-      final now = DateTime.now();
-      if (_lastShakeTime == null || now.difference(_lastShakeTime!).inMilliseconds > 250) {
-        if (_lastShakeTime != null && now.difference(_lastShakeTime!).inMilliseconds < 850) {
-          _shakeCount++;
-          if (_shakeCount >= 2) {
-            _cycleMode();
-            _shakeCount = 0;
-          }
-        } else {
-          _shakeCount = 1;
-        }
-        _lastShakeTime = now;
-      }
-    }
+  void _quickZero() {
+    _sessionOffX += _gx;
+    _sessionOffY += _gy;
+    _sessionOffZ += _gz;
+    _sessionOffAX += _ax;
+    _sessionOffAY += _ay;
+    _vx = 0;
+    _vy = 0;
   }
 
   void _cycleMode() {
@@ -847,9 +850,10 @@ class _DashboardPageState extends State<DashboardPage>
     });
 
     final modeLabels = {
-      ControllerMode.mouse: 'Tryb: Myszka 🖱️',
-      ControllerMode.media: 'Tryb: Media 📺',
+      ControllerMode.mouse:  'Tryb: Myszka 🖱️',
+      ControllerMode.media:  'Tryb: Media 📺',
       ControllerMode.social: 'Tryb: Instagram 📸',
+      ControllerMode.camera: 'Tryb: Aparat 📷',
     };
     final activeLabel = modeLabels[_controllerMode] ?? 'Tryb: Myszka';
 
@@ -871,9 +875,10 @@ class _DashboardPageState extends State<DashboardPage>
   void _updateNotification() {
     if (_connState == BluetoothConnectionState.connected) {
       final modeLabels = {
-        ControllerMode.mouse: 'Myszka 🖱️',
-        ControllerMode.media: 'Media 📺',
+        ControllerMode.mouse:  'Myszka 🖱️',
+        ControllerMode.media:  'Media 📺',
         ControllerMode.social: 'Instagram 📸',
+        ControllerMode.camera: 'Aparat 📷',
       };
       final modeLabel = modeLabels[_controllerMode] ?? 'Mysz';
       _ch.invokeMethod('showNotification', {
@@ -1092,8 +1097,9 @@ class _DashboardPageState extends State<DashboardPage>
                     border: Border.all(color: cs.secondary.withOpacity(0.4)),
                   ),
                   child: Text(
-                    _controllerMode == ControllerMode.mouse ? 'Myszka 🖱️' :
-                    _controllerMode == ControllerMode.media ? 'Media 📺' : 'Social 📸',
+                    _controllerMode == ControllerMode.mouse  ? 'Myszka 🖱️' :
+                    _controllerMode == ControllerMode.media  ? 'Media 📺' :
+                    _controllerMode == ControllerMode.social ? 'Instagram 📸' : 'Aparat 📷',
                     style: TextStyle(fontSize: 11, color: cs.secondary, fontWeight: FontWeight.bold),
                   ),
                 ),

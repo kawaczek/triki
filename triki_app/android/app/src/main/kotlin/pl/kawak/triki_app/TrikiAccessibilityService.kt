@@ -215,4 +215,15 @@ class TrikiAccessibilityService : AccessibilityService() {
             null, null
         )
     }
+
+    fun performCameraShutter() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        val dm = resources.displayMetrics
+        // Tap at bottom-center of screen where camera shutter button typically is
+        val x = dm.widthPixels / 2f
+        val y = dm.heightPixels * 0.85f
+        val path = Path().apply { moveTo(x, y) }
+        val stroke = GestureDescription.StrokeDescription(path, 0, 60)
+        dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+    }
 }
