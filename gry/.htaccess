@@ -7,13 +7,14 @@ Options -Indexes
     Header always set Expires "0"
 </FilesMatch>
 
-# Wykryj ?v= w query stringu (cache-busting param)
-SetEnvIf QUERY_STRING "v=" HAS_VERSION
-
-# Assety z ?v= — cache na rok (immutable); bez ?v= (np. gameutils.js z ES import) — 1 godzina
+# Wszystkie wersjonowane assety — cache na rok
 <FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
-    Header always set Cache-Control "public, max-age=31536000, immutable" env=HAS_VERSION
-    Header always set Cache-Control "public, max-age=3600" env=!HAS_VERSION
+    Header always set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+
+# gameutils.js ładowany przez ES import bez ?v= — 1 godzina (nadpisuje regułę wyżej)
+<FilesMatch "gameutils\.js$">
+    Header always set Cache-Control "public, max-age=3600"
 </FilesMatch>
 
 # Blokada bezpośredniego dostępu do data/
