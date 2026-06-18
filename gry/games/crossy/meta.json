@@ -1,0 +1,13 @@
+{
+  "title": "Żabka Skacze!",
+  "emoji": "🐸",
+  "description": "Przeskocz przez ulicę i rzekę! Kliknij żeby skoczyć.",
+  "difficulty": "Średnia",
+  "color": "green",
+  "scheme": "tilt",
+  "controls": { "ble": "Guzik = skok do przodu · Przechyl L/R = krok boczny" },
+  "hasScore": true,
+  "scoreUnit": "kroków",
+  "order": 54,
+  "tag": "arcade"
+}

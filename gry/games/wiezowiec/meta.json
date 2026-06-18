@@ -1,0 +1,17 @@
+{
+  "title": "Wieżowiec",
+  "emoji": "🏗️",
+  "description": "Klikaj w odpowiednim momencie żeby ustawiać piętra wieży!",
+  "difficulty": "Średnia",
+  "color": "blue",
+  "scheme": "tilt",
+  "controls": {
+    "ble": "Guzik = upuść piętro w odpowiednim momencie",
+    "mouse": "Kliknij w odpowiednim momencie",
+    "keys": "Spacja = upuść piętro"
+  },
+  "hasScore": true,
+  "scoreUnit": "pięter",
+  "order": 64,
+  "tag": "skill"
+}

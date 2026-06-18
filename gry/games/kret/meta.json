@@ -1,0 +1,13 @@
+{
+  "title": "Kret!",
+  "emoji": "🦫",
+  "description": "Przechylaj kapsel żeby celować, kliknij żeby uderzyć kreta!",
+  "difficulty": "Średnia",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": { "ble": "Przechyl = celuj · Guzik = uderzenie" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 53,
+  "tag": "skill"
+}

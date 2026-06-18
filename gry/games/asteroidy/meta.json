@@ -1,0 +1,13 @@
+{
+  "title": "Asteroidy",
+  "emoji": "🚀",
+  "description": "Obracaj statek kapslem i niszcz asteroidy!",
+  "difficulty": "Średnia",
+  "color": "blue",
+  "scheme": "rotate",
+  "controls": { "ble": "Obróć kapsel = kierunek · Pochyl do przodu = napęd · Guzik = strzał" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 57,
+  "tag": "arcade"
+}

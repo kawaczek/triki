@@ -1,0 +1,13 @@
+{
+  "title": "Bubble Shooter",
+  "emoji": "🫧",
+  "description": "Obracaj kapsel żeby celować i strzelaj bąbelkami!",
+  "difficulty": "Średnia",
+  "color": "blue",
+  "scheme": "rotate",
+  "controls": { "ble": "Obróć kapsel = celuj · Guzik = strzał" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 58,
+  "tag": "puzzle"
+}

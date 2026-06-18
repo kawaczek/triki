@@ -1,0 +1,13 @@
+{
+  "title": "Mini Golf",
+  "emoji": "⛳",
+  "description": "Przechylaj żeby celować, potrząśnij kapslem żeby uderzyć!",
+  "difficulty": "Średnia",
+  "color": "green",
+  "scheme": "tilt",
+  "controls": { "ble": "Przechyl = celuj · Potrząśnij = uderzenie (siła zależy od intensywności)" },
+  "hasScore": true,
+  "scoreUnit": "uderzeń",
+  "order": 60,
+  "tag": "skill"
+}

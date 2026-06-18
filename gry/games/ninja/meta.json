@@ -1,0 +1,13 @@
+{
+  "title": "Ninja Slash",
+  "emoji": "🥷",
+  "description": "Potrząśnij kapslem żeby ciąć! Tnij owoce, omijaj bomby!",
+  "difficulty": "Średnia",
+  "color": "blue",
+  "scheme": "tilt",
+  "controls": { "ble": "Potrząśnij = cięcie · Przechyl = pozycja ostrza" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 67,
+  "tag": "skill"
+}

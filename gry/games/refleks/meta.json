@@ -1,0 +1,13 @@
+{
+  "title": "Refleks",
+  "emoji": "⚡",
+  "description": "Kliknij jak najszybciej gdy zobaczysz sygnał! Sprawdź swój refleks.",
+  "difficulty": "Łatwa",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": { "ble": "Guzik = kliknij gdy zobaczysz ZIELONY!" },
+  "hasScore": true,
+  "scoreUnit": "ms",
+  "order": 68,
+  "tag": "skill"
+}

@@ -1,0 +1,14 @@
+{
+  "title": "Gorący Kartofel",
+  "emoji": "🥔",
+  "description": "Trzymaj telefon — kiedy wibracja się kończy, przegrywasz! Podaj dalej!",
+  "difficulty": "Towarzyska",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": { "ble": "Guzik = podaj dalej" },
+  "hasScore": false,
+  "scoreUnit": "",
+  "order": 52,
+  "tag": "party",
+  "type": "app"
+}

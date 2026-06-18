@@ -1,0 +1,15 @@
+{
+  "title": "Memory",
+  "emoji": "🃏",
+  "description": "Znajdź pary kart! Przechylaj żeby wybrać, kliknij żeby odkryć.",
+  "difficulty": "Łatwa",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": {
+    "ble": "Przechyl = przesuń kursor · Guzik = odkryj kartę"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 66,
+  "tag": "puzzle"
+}

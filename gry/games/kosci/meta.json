@@ -1,0 +1,13 @@
+{
+  "title": "Kości",
+  "emoji": "🎲",
+  "description": "Potrząśnij kapslem żeby rzucić kośćmi! Zbierz najlepszy układ.",
+  "difficulty": "Łatwa",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": { "ble": "Potrząśnij = rzut · Guzik = zatrzymaj/odblokuj kość" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 56,
+  "tag": "party"
+}

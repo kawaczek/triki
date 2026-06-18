@@ -1,0 +1,15 @@
+{
+  "title": "Powtórz!",
+  "emoji": "🎨",
+  "description": "Zapamiętaj sekwencję kolorów i powtórz przechylając kapsel!",
+  "difficulty": "Średnia",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": {
+    "ble": "Przechyl L/R/góra/dół = wybierz kolor · Guzik = zatwierdź"
+  },
+  "hasScore": true,
+  "scoreUnit": "rund",
+  "order": 65,
+  "tag": "skill"
+}

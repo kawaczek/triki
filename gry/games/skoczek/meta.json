@@ -1,0 +1,17 @@
+{
+  "title": "Skoczek",
+  "emoji": "🐸",
+  "description": "Skacz coraz wyżej! Przechylaj żeby sterować.",
+  "difficulty": "Łatwa",
+  "color": "green",
+  "scheme": "tilt",
+  "controls": {
+    "ble": "Przechyl L/R = steruj skoczkiem",
+    "mouse": "Przesuń kursor w lewo/prawo",
+    "keys": "Strzałki lewo/prawo"
+  },
+  "hasScore": true,
+  "scoreUnit": "m",
+  "order": 63,
+  "tag": "arcade"
+}

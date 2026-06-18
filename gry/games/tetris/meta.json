@@ -1,0 +1,13 @@
+{
+  "title": "Tetris",
+  "emoji": "🟦",
+  "description": "Klasyczny Tetris! Przechylaj żeby przesuwać, guzik żeby obracać.",
+  "difficulty": "Średnia",
+  "color": "blue",
+  "scheme": "tilt",
+  "controls": { "ble": "Przechyl L/R = przesuń · Guzik = obróć · Przechyl do przodu = szybciej" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 55,
+  "tag": "puzzle"
+}

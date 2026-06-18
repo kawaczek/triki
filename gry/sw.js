@@ -1,11 +1,11 @@
 // sw.js — Triki Games Service Worker
-const CACHE = 'triki-v202606181200';
+const CACHE = 'triki-v202606182000';
 
 const PRECACHE = [
   '/',
-  '/static/triki.js?v=202606181200',
-  '/static/app.js?v=202606181200',
-  '/static/style.css?v=202606181200',
+  '/static/triki.js?v=202606182000',
+  '/static/app.js?v=202606182000',
+  '/static/style.css?v=202606182000',
   '/static/gameutils.js',
   '/static/sound.js',
   '/static/icon.svg',

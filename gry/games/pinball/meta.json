@@ -1,0 +1,13 @@
+{
+  "title": "Pinball",
+  "emoji": "🎯",
+  "description": "Przechylaj kapsel w lewo/prawo żeby sterować flipperami!",
+  "difficulty": "Trudna",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": { "ble": "Przechyl L = lewy flipper · Przechyl R = prawy flipper · Guzik = wystrzał" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 59,
+  "tag": "arcade"
+}

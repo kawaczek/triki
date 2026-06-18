@@ -1,0 +1,13 @@
+{
+  "title": "Flappy Żabka",
+  "emoji": "🐸",
+  "description": "Kliknij guzik żeby przefrunąć przez rury!",
+  "difficulty": "Trudna",
+  "color": "green",
+  "scheme": "tilt",
+  "controls": { "ble": "Guzik = machnięcie skrzydłami" },
+  "hasScore": true,
+  "scoreUnit": "rur",
+  "order": 51,
+  "tag": "arcade"
+}
