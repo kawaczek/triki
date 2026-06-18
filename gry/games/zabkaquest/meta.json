@@ -1,0 +1,13 @@
+{
+  "title": "Żabka Quest",
+  "emoji": "⚔️",
+  "description": "Epicka przygoda! Uratuj Księżniczkę Żabkę przed Wielkim Wężem. RPG z walką, ekwipunkiem i 12 pokojami!",
+  "difficulty": "Epicka",
+  "color": "green",
+  "scheme": "tilt",
+  "controls": { "ble": "Przechyl = ruch · Guzik = atak/rozmowa · Potrząśnij = eliksir" },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 99,
+  "tag": "rpg"
+}
