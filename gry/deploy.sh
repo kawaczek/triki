@@ -73,12 +73,22 @@ chmod 644 data/.htaccess
 quit
 EOF
 
-# Uprawnienia dla wszystkich gier — jeden przebieg find po stronie lftp
-lftp -u "$FTP_GRY_USER,$FTP_GRY_PASS" "$FTP_HOST" << 'EOFIX'
-set ssl:verify-certificate no
-find games -maxdepth 1 -type d -exec chmod 755 {} \;
-find games -maxdepth 2 -type f -exec chmod 644 {} \;
-quit
-EOFIX
+# Uprawnienia gier — generuj komendy chmod przez Python i przekaż do lftp
+CHMOD_CMDS=$(python3 -c "
+import os
+lines = ['set ssl:verify-certificate no']
+gd = 'games'
+if os.path.isdir(gd):
+    for g in sorted(os.listdir(gd)):
+        if g.startswith('_'): continue
+        p = gd+'/'+g
+        if not os.path.isdir(p): continue
+        lines.append('chmod 755 '+p)
+        for f in sorted(os.listdir(p)):
+            lines.append('chmod 644 '+p+'/'+f)
+lines.append('quit')
+print('\n'.join(lines))
+")
+echo "$CHMOD_CMDS" | lftp -u "$FTP_GRY_USER,$FTP_GRY_PASS" "$FTP_HOST"
 
 echo "✓ gotowe → https://gry.kawak.pl"
