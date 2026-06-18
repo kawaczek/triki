@@ -7,18 +7,14 @@ Options -Indexes
     Header always set Expires "0"
 </FilesMatch>
 
-# Assety z ?v= — cache na rok (immutable)
-<If "%{QUERY_STRING} =~ /v=/">
-  <FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
-    Header always set Cache-Control "public, max-age=31536000, immutable"
-  </FilesMatch>
-</If>
-# Assety bez ?v= (np. gameutils.js importowany przez ES module) — cache 1 godzina
-<Else>
-  <FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
-    Header always set Cache-Control "public, max-age=3600"
-  </FilesMatch>
-</Else>
+# Wykryj ?v= w query stringu (cache-busting param)
+SetEnvIf QUERY_STRING "v=" HAS_VERSION
+
+# Assety z ?v= — cache na rok (immutable); bez ?v= (np. gameutils.js z ES import) — 1 godzina
+<FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
+    Header always set Cache-Control "public, max-age=31536000, immutable" env=HAS_VERSION
+    Header always set Cache-Control "public, max-age=3600" env=!HAS_VERSION
+</FilesMatch>
 
 # Blokada bezpośredniego dostępu do data/
 RewriteEngine On
