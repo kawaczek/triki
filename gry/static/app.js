@@ -182,7 +182,8 @@ $('btn-game-settings').addEventListener('click', openSettings);
 // ════════════════════════════════════════════════════════
 // WAKE LOCK
 // ════════════════════════════════════════════════════════
-let _wakeLock = null;
+let _wakeLock      = null;
+let _bleDiscPaused = false;  // gra wstrzymana z powodu rozłączenia BLE
 async function _requestWakeLock() {
   if (!('wakeLock' in navigator)) return;
   try { _wakeLock = await navigator.wakeLock.request('screen'); } catch(_) {}
@@ -1143,6 +1144,7 @@ function emit(evt, data) {
 
 function showStartOverlay(meta) {
   ovEnd.classList.add('hidden');
+  $('ov-crash')?.classList.add('hidden');
   ovStart.classList.remove('hidden');
 
   $('ov-start-emoji').textContent  = meta.emoji || '🎮';
@@ -1189,6 +1191,13 @@ function showStartOverlay(meta) {
   // Zaktualizuj tekst i styl przycisku w zależności od stanu połączenia
   updateStartOverlayButton();
 
+  // przycisk szybkiej kalibracji na nakładce startowej
+  const calibBtn = $('btn-start-calib');
+  if (calibBtn) {
+    calibBtn.style.display = triki.connected ? '' : 'none';
+    calibBtn.onclick = async () => { await startCalib(); };
+  }
+
   btnStart.onclick = async () => {
     if (!triki.connected) {
       try {
@@ -1213,15 +1222,37 @@ function startLoop() {
   stopLoop();
   lastT = performance.now();
   function loop(t) {
-    const dt = Math.min(t - lastT, 100); // cap at 100ms
+    const dt = Math.min(t - lastT, 100);
     lastT = t;
-    logFrame();
-    current?.inst?.update?.(dt);
-    current?.inst?.draw?.(dt);
+    try {
+      current?.inst?.update?.(dt);
+      current?.inst?.draw?.(dt);
+    } catch(err) {
+      stopLoop();
+      showGameCrash(err);
+      return;
+    }
     rafId = requestAnimationFrame(loop);
   }
   rafId = requestAnimationFrame(loop);
 }
+
+function showGameCrash(err) {
+  console.error('[game crash]', err);
+  const ov = $('ov-crash');
+  if (!ov) return;
+  $('ov-crash-msg').textContent = err?.message || String(err);
+  ov.classList.remove('hidden');
+}
+
+$('btn-crash-menu')?.addEventListener('click', () => {
+  $('ov-crash').classList.add('hidden');
+  goHub(true);
+});
+$('btn-crash-restart')?.addEventListener('click', () => {
+  $('ov-crash').classList.add('hidden');
+  if (current) { ovEnd.classList.add('hidden'); showStartOverlay(current.meta); }
+});
 
 function stopLoop() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
@@ -1280,18 +1311,33 @@ async function submitScore(gameId, score) {
   } catch(_) {}
 }
 
+let _lbPeriod = 'all';
+
 async function renderLeaderboard(gameId, myScore) {
   const el = $('ov-leaderboard');
   el.innerHTML = '<p style="opacity:.4;font-size:.8rem">Ładowanie tabeli…</p>';
   try {
-    const scores = await fetch(`/api/scores/${gameId}`).then(r => r.json());
-    if (!scores.length) { el.innerHTML = ''; return; }
+    const scores = await fetch(`/api/scores/${gameId}?period=${_lbPeriod}`).then(r => r.json());
+
+    const periodBtns = `
+      <div class="lb-period" style="display:flex;gap:6px;margin-bottom:8px;justify-content:center">
+        ${['all','week','today'].map(p => `
+          <button onclick="window._app.setLbPeriod('${p}','${gameId}',${myScore})"
+            style="padding:3px 10px;border-radius:20px;border:1px solid rgba(255,255,255,.2);
+                   background:${_lbPeriod===p?'rgba(34,197,94,.25)':'transparent'};
+                   color:${_lbPeriod===p?'#22c55e':'rgba(255,255,255,.5)'};
+                   font-size:.7rem;cursor:pointer;font-family:inherit">
+            ${{all:'Wszech czasów',week:'7 dni',today:'Dziś'}[p]}
+          </button>`).join('')}
+      </div>`;
+
+    if (!scores.length) { el.innerHTML = periodBtns + '<p style="opacity:.4;font-size:.8rem;text-align:center">Brak wyników</p>'; return; }
     const top = scores.slice(0, 10);
     const myPos = player ? scores.findIndex(s => s.device_id === player.deviceId) : -1;
 
-    let html = '<div class="leaderboard"><div class="lb-title">🏆 Najlepsi gracze</div>';
+    let html = periodBtns + '<div class="leaderboard"><div class="lb-title">🏆 Najlepsi gracze</div>';
     top.forEach((s, i) => {
-      const isMe = player && s.device_id === player.deviceId && s.score === myScore;
+      const isMe = player && s.device_id === player.deviceId;
       html += `<div class="lb-row${isMe ? ' lb-me' : ''}">
         <span class="lb-rank">#${i+1}</span>
         <span class="lb-dot" style="background:${s.color||'#888'}"></span>
@@ -1299,7 +1345,6 @@ async function renderLeaderboard(gameId, myScore) {
         <span class="lb-score">${s.score}</span>
       </div>`;
     });
-    // show player position if outside top 10
     if (myPos >= 10) {
       const s = scores[myPos];
       html += `<div class="lb-row lb-me lb-gap">
@@ -1505,10 +1550,46 @@ triki.onStatus = () => {
     clearInterval(_logInterval); _logInterval = null;
     renderLogBtn();
   }
+  // aktualizuj przycisk kalibracji na nakładce startowej
+  const calibBtn = $('btn-start-calib');
+  if (calibBtn && gameView.style.display !== 'none' && !ovStart.classList.contains('hidden')) {
+    calibBtn.style.display = triki.connected ? '' : 'none';
+  }
+  // BLE disconnect mid-game: pauzuj grę
+  const discOv = $('ov-disconnect');
+  if (!discOv) return;
+  const inGame = gameView.style.display !== 'none'
+    && ovStart.classList.contains('hidden')
+    && ovEnd.classList.contains('hidden')
+    && !$('ov-crash')?.classList.contains('hidden') === false;
+  if (inGame && !triki.connected && !triki.connecting) {
+    if (rafId) { stopLoop(); _bleDiscPaused = true; }
+    discOv.classList.remove('hidden');
+  } else if (triki.connected && _bleDiscPaused) {
+    discOv.classList.add('hidden');
+    _bleDiscPaused = false;
+    if (current) startLoop();
+  } else if (triki.connected) {
+    discOv.classList.add('hidden');
+  }
 };
 
+$('btn-disc-reconnect')?.addEventListener('click', () => bleAction());
+$('btn-disc-menu')?.addEventListener('click', () => {
+  $('ov-disconnect').classList.add('hidden');
+  _bleDiscPaused = false;
+  goHub(true);
+});
+
 // ── expose to HTML onclick attrs ──────────────────────────
-window._app = { bleAction, editProfile };
+window._app = {
+  bleAction,
+  editProfile,
+  setLbPeriod(period, gameId, myScore) {
+    _lbPeriod = period;
+    renderLeaderboard(gameId, myScore);
+  },
+};
 
 // ── init ──────────────────────────────────────────────────
 loadPlayer();
@@ -1546,6 +1627,11 @@ if (sensSlider && sensVal) {
 
 // auto-reconnect to last known device
 triki.autoConnect().catch(() => {});
+
+// tryb demo: ?demo=1 symuluje sensor bez fizycznego kapsla
+if (new URLSearchParams(window.location.search).get('demo') === '1') {
+  triki.startDemo();
+}
 
 // ── Pętla do obsługi gestów menu w tle (Hub, Nakładka Startowa, Nakładka Końcowa) ──
 function updateMenuGestures() {

@@ -23,9 +23,13 @@
 
   <title>Triki Games - Darmowe Gry Retro na Kapsel BLE | gry.kawak.pl</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐸</text></svg>">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Triki Gry">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css?v=202606180000">
+  <link rel="stylesheet" href="/static/style.css?v=202606181200">
 </head>
 <body>
 
@@ -95,7 +99,7 @@
     <p class="hub-footer-links">
       🎮 Kapsel BLE &nbsp;·&nbsp; 🖱️ Mysz &nbsp;·&nbsp; 👆 Dotyk
     </p>
-    <p class="hub-version">v 2026-06-18 00:00</p>
+    <p class="hub-version">v 2026-06-18 12:00</p>
   </div>
 </div>
 
@@ -148,6 +152,28 @@
   <div class="canvas-container" id="canvas-container">
     <canvas id="game-canvas"></canvas>
 
+    <!-- Disconnect overlay (BLE lost mid-game) -->
+    <div class="game-overlay hidden" id="ov-disconnect" style="background:rgba(6,8,16,.92);z-index:20">
+      <div class="ov-emoji">⚡</div>
+      <div class="ov-title">Kapsel się rozłączył</div>
+      <div class="ov-sub" style="opacity:.6">Gra jest wstrzymana — połącz ponownie</div>
+      <div class="ov-btns" style="margin-top:16px">
+        <button class="btn-primary" id="btn-disc-reconnect">🔌 Połącz ponownie</button>
+        <button class="btn-outline" id="btn-disc-menu">← Menu</button>
+      </div>
+    </div>
+
+    <!-- Crash overlay -->
+    <div class="game-overlay hidden" id="ov-crash" style="background:rgba(6,8,16,.95);z-index:25">
+      <div class="ov-emoji">💥</div>
+      <div class="ov-title">Gra padła</div>
+      <div class="ov-sub" id="ov-crash-msg" style="font-size:.75rem;opacity:.5;word-break:break-all;max-width:280px"></div>
+      <div class="ov-btns" style="margin-top:16px">
+        <button class="btn-outline" id="btn-crash-menu">← Menu</button>
+        <button class="btn-primary green" id="btn-crash-restart">↺ Spróbuj ponownie</button>
+      </div>
+    </div>
+
     <!-- Start overlay -->
     <div class="game-overlay" id="ov-start">
       <div class="ov-emoji"    id="ov-start-emoji"></div>
@@ -157,6 +183,7 @@
       <div class="ov-controls" id="ov-start-controls"></div>
       <div class="ov-modes"    id="ov-start-modes"></div>
       <div class="ov-btns">
+        <button class="btn-outline" id="btn-start-calib" style="display:none">🎯 Skalibruj</button>
         <button class="btn-primary green" id="btn-start">▶ START</button>
       </div>
     </div>
@@ -195,7 +222,19 @@
   </div>
 </div>
 
-<script src="/static/triki.js?v=202606180000"></script>
-<script src="/static/app.js?v=202606180000"></script>
+<script src="/static/triki.js?v=202606181200"></script>
+<script src="/static/app.js?v=202606181200"></script>
+<script>
+  // Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+  // Hot-reload (tylko lokalnie)
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    const _es = new EventSource('/api/dev-reload');
+    _es.onmessage = () => location.reload();
+    _es.onerror = () => _es.close();
+  }
+</script>
 </body>
 </html>

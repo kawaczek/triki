@@ -42,7 +42,13 @@ if (($route === '/games' || $route === '') && $method === 'GET') {
 if (preg_match('#^/scores/([a-z0-9_]+)$#', $route, $m)) {
     $f = DATA . '/scores/' . $m[1] . '.json';
     if ($method === 'GET') {
-        ok(read_json($f) ?? []);
+        $scores = read_json($f) ?? [];
+        $period = $_GET['period'] ?? 'all';
+        if ($period !== 'all') {
+            $cutoff = $period === 'today' ? strtotime('today UTC') : strtotime('-7 days');
+            $scores = array_values(array_filter($scores, fn($s) => strtotime($s['ts'] ?? '1970') >= $cutoff));
+        }
+        ok($scores);
     }
     $b = body();
     mkd(DATA . '/scores');

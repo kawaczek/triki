@@ -52,7 +52,13 @@ class Handler(SimpleHTTPRequestHandler):
 
         elif m := re.match(r'^/api/scores/([a-z0-9_]+)$', path):
             f = DATA / 'scores' / f'{m.group(1)}.json'
-            self._ok(json.loads(f.read_text('utf-8')) if f.exists() else [])
+            scores = json.loads(f.read_text('utf-8')) if f.exists() else []
+            period = dict(p.split('=') for p in urlparse(self.path).query.split('&') if '=' in p).get('period', 'all')
+            if period != 'all':
+                now = datetime.datetime.utcnow()
+                cutoff = now - datetime.timedelta(days=1 if period == 'today' else 7)
+                scores = [s for s in scores if self._parse_ts(s.get('ts','')) >= cutoff]
+            self._ok(scores)
 
         elif path == '/api/players':
             f = DATA / 'players.json'
@@ -74,6 +80,9 @@ class Handler(SimpleHTTPRequestHandler):
                         'device_id' : did,
                     }
             self._ok(sorted(devices.values(), key=lambda x: x['triki_name']))
+
+        elif path == '/api/dev-reload':
+            self._sse_reload()
 
         else:
             self.send_error(404)
@@ -143,6 +152,37 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_error(404)
 
     # ── helpers ─────────────────────────────────────────
+    def _parse_ts(self, ts):
+        try:
+            return datetime.datetime.fromisoformat(ts.rstrip('Z'))
+        except Exception:
+            return datetime.datetime.min
+
+    def _sse_reload(self):
+        import time as _time
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('X-Accel-Buffering', 'no')
+        self._cors()
+        self.end_headers()
+        watched = {f: f.stat().st_mtime for f in BASE.rglob('*')
+                   if f.suffix in ('.js', '.html', '.css', '.json') and 'data' not in f.parts}
+        try:
+            while True:
+                _time.sleep(0.6)
+                for f in list(BASE.rglob('*')):
+                    if f.suffix not in ('.js', '.html', '.css', '.json'): continue
+                    if 'data' in f.parts: continue
+                    mt = f.stat().st_mtime
+                    if f not in watched or mt > watched[f]:
+                        watched[f] = mt
+                        msg = f'data: {{"file":"{f.name}"}}\n\n'.encode()
+                        self.wfile.write(msg)
+                        self.wfile.flush()
+        except Exception:
+            pass
+
     def _body(self):
         n = int(self.headers.get('Content-Length', 0))
         return json.loads(self.rfile.read(n)) if n else {}

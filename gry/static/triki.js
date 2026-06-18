@@ -41,6 +41,9 @@ class TrikiController {
     try { const s = localStorage.getItem('triki_calib_v2'); if (s) this._calibV2 = JSON.parse(s); } catch(_) {}
     this._rotDrift  = 0;       // offset gz ustawiany w chwili kalibracji (snapshot)
     this.autoInvert  = true;
+    this._shaking    = false;  // poziom: czy trwa potrząsanie
+    this._shakeEdge  = false;  // zbocze: jednorazowy tick po rozpoczęciu potrząsania
+    this._demoTimer  = null;   // timer trybu demo (?demo=1)
   }
 
   // ── auto-connect do zapamiętanego urządzenia ──────────────
@@ -167,9 +170,43 @@ class TrikiController {
     if (this.isFlipped !== oldFlipped) {
       this._emit();
     }
+    // detekcja potrząsania (edge-triggered)
+    const g = Math.hypot(this.ax, this.ay, this.az);
+    const isShaking = Math.abs(g - 1.0) > 0.35;
+    if (isShaking && !this._shaking) this._shakeEdge = true;
+    this._shaking = isShaking;
   }
 
-  consumeClick() { const v = this._btnEdge; this._btnEdge = false; return v; }
+  consumeClick()  { const v = this._btnEdge;  this._btnEdge  = false; return v; }
+  consumeShake()  { const v = this._shakeEdge; this._shakeEdge = false; return v; }
+
+  // ── tryb demo: symuluje sensor bez fizycznego kapsla ─────
+  startDemo() {
+    if (this._demoTimer) return;
+    this.connected = true; this.name = 'DEMO'; this.deviceId = 'demo';
+    let t = 0;
+    this._demoTimer = setInterval(() => {
+      t += 0.05;
+      this.gx = Math.sin(t * 0.8) * 80;
+      this.gz = Math.sin(t * 1.1) * 80;
+      this.ax = Math.sin(t * 0.5) * 0.35;
+      this.ay = Math.cos(t * 0.7) * 0.35;
+      this.az = 1.0;
+      // symulacja kliknięcia co ~3s
+      const beat = Math.floor(t / (Math.PI * 2 / 0.8));
+      if (beat !== this._demoBeat) { this._btnEdge = true; this._demoBeat = beat; }
+    }, 50);
+    this._demoBeat = 0;
+    this._emit();
+  }
+
+  stopDemo() {
+    if (!this._demoTimer) return;
+    clearInterval(this._demoTimer); this._demoTimer = null;
+    this.connected = false; this.name = ''; this.deviceId = '';
+    this.gx = this.gy = this.gz = this.ax = this.ay = 0; this.az = 1;
+    this._emit();
+  }
 
   // ── kalibracja 2-krokowa (button-triggered) ───────────────
   // Krok 1: wywołaj gdy kapsel w neutralnej pozycji tuż przed kliknięciem

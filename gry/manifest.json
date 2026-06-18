@@ -1,0 +1,16 @@
+{
+  "name": "Triki Gry",
+  "short_name": "Triki",
+  "description": "Minigry sterowane kapslem Żabki BLE",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0c10",
+  "theme_color": "#0a0c10",
+  "orientation": "portrait",
+  "lang": "pl",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "screenshots": []
+}
