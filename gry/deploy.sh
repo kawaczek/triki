@@ -73,15 +73,12 @@ chmod 644 data/.htaccess
 quit
 EOF
 
-# Uprawnienia dla każdej gry osobno
-for game_dir in $GAME_DIRS; do
-  game=$(basename "$game_dir")
-  lftp -u "$FTP_GRY_USER,$FTP_GRY_PASS" "$FTP_HOST" << EOF
+# Uprawnienia dla wszystkich gier — jeden przebieg find po stronie lftp
+lftp -u "$FTP_GRY_USER,$FTP_GRY_PASS" "$FTP_HOST" << 'EOFIX'
 set ssl:verify-certificate no
-chmod 755 games/$game
-glob chmod 644 games/$game/*
+find games -maxdepth 1 -type d -exec chmod 755 {} \;
+find games -maxdepth 2 -type f -exec chmod 644 {} \;
 quit
-EOF
-done
+EOFIX
 
 echo "✓ gotowe → https://gry.kawak.pl"

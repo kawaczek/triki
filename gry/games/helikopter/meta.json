@@ -1,0 +1,13 @@
+{
+  "title": "Helikopter",
+  "emoji": "🚁",
+  "description": "Klikaj żeby wznosić się, unikaj sufitu i podłogi!",
+  "difficulty": "Trudna",
+  "color": "blue",
+  "scheme": "tilt",
+  "controls": { "ble": "Guzik = silnik (wznoś się) · Puść = opadaj" },
+  "hasScore": true,
+  "scoreUnit": "m",
+  "order": 62,
+  "tag": "arcade"
+}

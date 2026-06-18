@@ -1,0 +1,17 @@
+{
+  "title": "Czołgi!",
+  "emoji": "🚀",
+  "description": "Zniszcz wrogów! Obracaj kapsel żeby celować, przechyl żeby jechać.",
+  "difficulty": "Trudna",
+  "color": "green",
+  "scheme": "tilt",
+  "controls": {
+    "ble": "Przechyl L/R = jedź · Obróć kapsel = celuj · Guzik = strzał",
+    "mouse": "Mysz = celuj · Klik = strzał · WSAD = jedź",
+    "keys": "WSAD = jedź · Mysz = celuj · Spacja = strzał"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 70,
+  "tag": "arcade"
+}

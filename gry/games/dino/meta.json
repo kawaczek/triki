@@ -1,0 +1,13 @@
+{
+  "title": "Dino Bieg",
+  "emoji": "🦕",
+  "description": "Nieskończony bieg! Kliknij żeby skakać, pochyl żeby kucać.",
+  "difficulty": "Średnia",
+  "color": "green",
+  "scheme": "tilt",
+  "controls": { "ble": "Guzik = skok · Przechyl do przodu = kucanie" },
+  "hasScore": true,
+  "scoreUnit": "m",
+  "order": 61,
+  "tag": "arcade"
+}

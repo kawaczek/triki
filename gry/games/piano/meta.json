@@ -1,0 +1,18 @@
+{
+  "title": "Piano",
+  "emoji": "🎹",
+  "description": "Graj melodie! Przechylaj kapsel żeby wybrać nutę, kliknij żeby zagrać.",
+  "difficulty": "Łatwa",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": {
+    "ble": "Przechyl L/R = wybierz nutę · Guzik = zagraj",
+    "mouse": "Kliknij klawisz = zagraj",
+    "keys": "←/→ = wybierz nutę · Spacja = zagraj"
+  },
+  "hasScore": false,
+  "scoreUnit": "",
+  "order": 69,
+  "tag": "music",
+  "type": "app"
+}
