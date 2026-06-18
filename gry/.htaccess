@@ -7,10 +7,18 @@ Options -Indexes
     Header always set Expires "0"
 </FilesMatch>
 
-# Statyczne assety z ?v= — cache na rok
-<FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
+# Assety z ?v= — cache na rok (immutable)
+<If "%{QUERY_STRING} =~ /v=/">
+  <FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
     Header always set Cache-Control "public, max-age=31536000, immutable"
-</FilesMatch>
+  </FilesMatch>
+</If>
+# Assety bez ?v= (np. gameutils.js importowany przez ES module) — cache 1 godzina
+<Else>
+  <FilesMatch "\.(js|css|png|svg|ico|woff2?)$">
+    Header always set Cache-Control "public, max-age=3600"
+  </FilesMatch>
+</Else>
 
 # Blokada bezpośredniego dostępu do data/
 RewriteEngine On

@@ -4,6 +4,7 @@
   "description": "Złam szyfr kręcąc tarczą w lewo/prawo. Słuchaj kliknięć i wciskaj guzik gdy trafisz!",
   "difficulty": "Średnia",
   "color": "green",
+  "scheme": "rotate",
   "controls": {
     "ble": "Obracaj kapslem by kręcić tarczą. Klikaj guzik by zatwierdzić zapadkę.",
     "mouse": null,

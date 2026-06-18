@@ -22,7 +22,7 @@ function read_json($f){ return file_exists($f) ? json_decode(file_get_contents($
 function write_json($f, $d) { file_put_contents($f, json_encode($d, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)); }
 
 // GET /api/games
-if ($route === '/games' || $route === '') {
+if (($route === '/games' || $route === '') && $method === 'GET') {
     $games = [];
     if (is_dir(GAMES)) {
         foreach (scandir(GAMES) as $d) {
@@ -46,9 +46,10 @@ if (preg_match('#^/scores/([a-z0-9_]+)$#', $route, $m)) {
     }
     $b = body();
     mkd(DATA . '/scores');
-    $scores   = read_json($f) ?? [];
-    $b['ts']  = $b['ts'] ?? now_iso();
-    $scores[] = $b;
+    $scores       = read_json($f) ?? [];
+    $b['ts']      = $b['ts'] ?? now_iso();
+    $b['score']   = is_numeric($b['score'] ?? null) ? (float)($b['score']) : 0;
+    $scores[]     = $b;
     usort($scores, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
     write_json($f, array_slice($scores, 0, 500));
     ok(['ok' => true]);

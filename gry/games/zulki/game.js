@@ -586,7 +586,7 @@ export default class ZulkiGame {
     ctx.font = `${Math.round(W * 0.03)}px Outfit, sans-serif`;
     ctx.fillText('Kliknij żeby zagrać jeszcze raz', W/2, H * 0.78);
 
-    if (this._score > 0 && !this._endEmitted) {
+    if (!this._endEmitted) {
       this._endEmitted = true;
       this.emit('end', { score: this._score });
     }

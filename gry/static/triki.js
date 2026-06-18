@@ -287,7 +287,7 @@ class TrikiController {
   }
 
   setAutoInvert(on) {
-    this.autoInvert = true;
+    this.autoInvert = on;
   }
 
   _emit() { this.onStatus?.(); }

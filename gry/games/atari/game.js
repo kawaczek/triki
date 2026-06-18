@@ -285,11 +285,11 @@ export default class AtariGame {
         for (let inv of this.invaders) {
           if (inv.alive) {
             inv.y += 0.05;
-            // Sprawdzenie przegranej (obcy dotarli na poziom gracza)
-            if (inv.y >= 0.78) {
+            if (inv.y >= 0.78 && !this.gameOver) {
               this.gameOver = true;
               this.emit('end', { score: this.score });
               RetroSound.playExplosion();
+              break;
             }
           }
         }

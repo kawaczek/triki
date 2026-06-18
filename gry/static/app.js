@@ -1328,6 +1328,7 @@ function setLocalHS(gid, v) {
 function goHub(shouldGoBack = true) {
   stopLoop();
   if (current?.inst?.destroy) current.inst.destroy();
+  else current?.inst?.stop?.();
   current = null;
   ovStart.classList.remove('hidden');
   ovEnd.classList.add('hidden');

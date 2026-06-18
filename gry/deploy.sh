@@ -21,7 +21,7 @@ FTP_HOST="ftp.dm72001.domenomania.eu"
 # ── Git commit (opcjonalnie) ─────────────────────────────────────────────────
 if [[ -n "$1" ]]; then
   echo "→ git commit: $1"
-  git add -A
+  git add .
   git commit -m "$1
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>" || true
