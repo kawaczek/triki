@@ -63,6 +63,10 @@ chmod 644 static/triki.js
 chmod 644 static/app.js
 chmod 644 static/style.css
 chmod 644 static/gameutils.js
+chmod 644 static/sound.js
+chmod 644 static/icon.svg
+chmod 644 manifest.json
+chmod 644 sw.js
 chmod 755 static
 chmod 755 games
 chmod 644 data/.htaccess
