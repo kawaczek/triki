@@ -298,12 +298,12 @@ function startCalib() {
     const SCALE  = 110;   // px per 1g
     const GOOD_G = 0.15;  // zalecany przechył
 
-    let rafId;
+    let calibRafId;
     let currentStep = 1;
     let btnReady = false;
 
     function finish(success) {
-      cancelAnimationFrame(rafId);
+      cancelAnimationFrame(calibRafId);
       ov.remove();
       resolve(success ? triki._calibV2 : null);
     }
@@ -412,7 +412,7 @@ function startCalib() {
 
     function tick() {
       drawTiltViz();
-      if (!btnReady) { btnReady = true; triki.consumeClick(); rafId = requestAnimationFrame(tick); return; }
+      if (!btnReady) { btnReady = true; triki.consumeClick(); calibRafId = requestAnimationFrame(tick); return; }
 
       if (triki.consumeClick()) {
         if (currentStep === 1) {
@@ -430,11 +430,11 @@ function startCalib() {
           }
         }
       }
-      rafId = requestAnimationFrame(tick);
+      calibRafId = requestAnimationFrame(tick);
     }
 
     showStep1();
-    rafId = requestAnimationFrame(tick);
+    calibRafId = requestAnimationFrame(tick);
   });
 }
 
@@ -1125,9 +1125,6 @@ async function openGame(meta) {
   const inst = new GameClass(canvas, ctx, triki, emit);
   current = { meta, inst };
 
-  // push history state to handle physical back button on Android
-  history.pushState({ inGame: true }, '');
-
   // start overlay
   showStartOverlay(meta);
 }
@@ -1561,7 +1558,7 @@ triki.onStatus = () => {
   const inGame = gameView.style.display !== 'none'
     && ovStart.classList.contains('hidden')
     && ovEnd.classList.contains('hidden')
-    && !$('ov-crash')?.classList.contains('hidden') === false;
+    && ($('ov-crash')?.classList.contains('hidden') ?? true);
   if (inGame && !triki.connected && !triki.connecting) {
     if (rafId) { stopLoop(); _bleDiscPaused = true; }
     discOv.classList.remove('hidden');

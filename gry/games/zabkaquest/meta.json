@@ -8,6 +8,6 @@
   "controls": { "ble": "Przechyl = ruch · Guzik = atak/rozmowa · Potrząśnij = eliksir" },
   "hasScore": true,
   "scoreUnit": "pkt",
-  "order": 99,
+  "order": 71,
   "tag": "rpg"
 }

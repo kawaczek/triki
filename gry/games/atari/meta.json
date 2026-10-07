@@ -11,6 +11,6 @@
   },
   "hasScore": true,
   "scoreUnit": "pkt",
-  "order": 1,
+  "order": 50,
   "scheme": "tilt"
 }

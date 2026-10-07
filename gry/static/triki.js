@@ -251,7 +251,7 @@ class TrikiController {
 
   get _ix() {
     let inv = this.invertX;
-    if (this.isFlipped) {
+    if (this.autoInvert && this.isFlipped) {
       inv = !inv;
     }
     return inv ? -1 : 1;
@@ -259,7 +259,7 @@ class TrikiController {
 
   get _iy() {
     let inv = this.invertY;
-    if (this.isFlipped) {
+    if (this.autoInvert && this.isFlipped) {
       inv = !inv;
     }
     return inv ? -1 : 1;

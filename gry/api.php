@@ -20,6 +20,22 @@ function mkd($path)   { if (!is_dir($path)) mkdir($path, 0755, true); }
 function now_iso()    { return gmdate('Y-m-d\TH:i:s\Z'); }
 function read_json($f){ return file_exists($f) ? json_decode(file_get_contents($f), true) : null; }
 function write_json($f, $d) { file_put_contents($f, json_encode($d, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)); }
+function update_json($f, callable $cb) {
+    $fp = fopen($f, 'c+');
+    if (!$fp) return false;
+    flock($fp, LOCK_EX);
+    $size = filesize($f);
+    $content = $size > 0 ? fread($fp, $size) : '';
+    $data = $content ? json_decode($content, true) : null;
+    $updated = $cb($data);
+    ftruncate($fp, 0);
+    rewind($fp);
+    fwrite($fp, json_encode($updated, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    fflush($fp);
+    flock($fp, LOCK_UN);
+    fclose($fp);
+    return true;
+}
 
 // GET /api/games
 if (($route === '/games' || $route === '') && $method === 'GET') {
@@ -52,12 +68,14 @@ if (preg_match('#^/scores/([a-z0-9_]+)$#', $route, $m)) {
     }
     $b = body();
     mkd(DATA . '/scores');
-    $scores       = read_json($f) ?? [];
-    $b['ts']      = $b['ts'] ?? now_iso();
-    $b['score']   = is_numeric($b['score'] ?? null) ? (float)($b['score']) : 0;
-    $scores[]     = $b;
-    usort($scores, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
-    write_json($f, array_slice($scores, 0, 500));
+    $b['ts']    = $b['ts'] ?? now_iso();
+    $b['score'] = is_numeric($b['score'] ?? null) ? (float)($b['score']) : 0;
+    update_json($f, function($scores) use ($b) {
+        $scores = is_array($scores) ? $scores : [];
+        $scores[] = $b;
+        usort($scores, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
+        return array_slice($scores, 0, 500);
+    });
     ok(['ok' => true]);
 }
 
@@ -71,14 +89,16 @@ if ($route === '/players') {
     $did = $b['device_id'] ?? null;
     if ($did) {
         mkd(DATA);
-        $players  = read_json($f) ?? [];
-        $now      = now_iso();
-        $existing = $players[$did] ?? [];
-        $b['last_seen'] = $b['last_seen'] ?? $now;
-        $b['created']   = $b['created']   ?? ($existing['created'] ?? $now);
-        unset($b['device_id']);
-        $players[$did]  = $b;
-        write_json($f, $players);
+        update_json($f, function($players) use ($b, $did) {
+            $players  = is_array($players) ? $players : [];
+            $now      = now_iso();
+            $existing = $players[$did] ?? [];
+            $b['last_seen'] = $b['last_seen'] ?? $now;
+            $b['created']   = $b['created']   ?? ($existing['created'] ?? $now);
+            unset($b['device_id']);
+            $players[$did]  = $b;
+            return $players;
+        });
     }
     ok(['ok' => true]);
 }
