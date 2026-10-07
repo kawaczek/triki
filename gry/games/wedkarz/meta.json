@@ -1,0 +1,15 @@
+{
+  "title": "Młody Wędkarz",
+  "emoji": "🎣",
+  "description": "Zarzuć wędkę kapslem, poczuj branie i kręć kołowrotkiem! Złów legendarnego Suma Żabkowego!",
+  "difficulty": "Łatwa",
+  "color": "blue",
+  "scheme": "rotate",
+  "controls": {
+    "ble": "Przycisk 🔘 = zarzut / zacięcie · Kręcenie kapslem 🔄 = zwijanie kołowrotka!"
+  },
+  "hasScore": true,
+  "scoreUnit": "g",
+  "order": 73,
+  "tag": "arcade"
+}

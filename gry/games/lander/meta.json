@@ -1,0 +1,15 @@
+{
+  "title": "Lądownik Księżycowy",
+  "emoji": "🚀",
+  "description": "Retro fizyka w kosmosie! Przechylaj kapsel aby ustawić kąt lądownika, a przyciskiem dawkuj ciąg silnika rakietowego!",
+  "difficulty": "Trudna",
+  "color": "purple",
+  "scheme": "tilt",
+  "controls": {
+    "ble": "Przechyl kapsel ↔️ = kąt nachylenia · Przycisk 🔘 = ciąg silnika rakietowego!"
+  },
+  "hasScore": true,
+  "scoreUnit": "pkt",
+  "order": 74,
+  "tag": "arcade"
+}

@@ -1,0 +1,15 @@
+{
+  "title": "Triki Drift",
+  "emoji": "🏎️",
+  "description": "Zostań mistrzem toru! Trzymaj kapsel jak kierownicę (obracaj lewo/prawo), unikaj przeszkód i wciskaj NITRO!",
+  "difficulty": "Średnia",
+  "color": "amber",
+  "scheme": "rotate",
+  "controls": {
+    "ble": "Obracaj kapslem 🔄 = skręcanie kołami · Przycisk 🔘 = NITRO Dopalacz!"
+  },
+  "hasScore": true,
+  "scoreUnit": "m",
+  "order": 72,
+  "tag": "arcade"
+}
